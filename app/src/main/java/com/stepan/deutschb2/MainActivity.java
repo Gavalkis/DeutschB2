@@ -47,6 +47,8 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
     int speechLesson=-1, speechExample=-1;
     ExecutorService cameraExecutor=Executors.newSingleThreadExecutor();
     long lastAnalysis=0;
+    volatile boolean cloudBusy=false;
+    String lastCloudWord="";
 
     final long[] SRS = {
             10*60_000L, 30*60_000L, 60*60_000L, 3*60*60_000L, 6*60*60_000L,
@@ -485,6 +487,15 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         if(!isOnline()){
             LinearLayout c=card();c.setAlpha(.55f);c.addView(tv("Камера недоступна офлайн",20,true));c.addView(tv("Подключись к интернету, чтобы включить распознавание предметов в реальном времени.",15,false));content.addView(c);return;
         }
+        String key=prefs.getString("vision_key","");
+        if(key.isEmpty()){
+            LinearLayout cfg=card();cfg.addView(tv("Подключить точное распознавание",20,true));
+            cfg.addView(tv("Для облачной модели нужен собственный API-ключ Gemini. Камера отправляет выбранные кадры Google. Возможны ограничения и платные запросы. Ключ хранится только на устройстве.",14,false));
+            EditText k=new EditText(this);k.setSingleLine(true);k.setHint("API-ключ из Google AI Studio");cfg.addView(k);
+            Button save=btn("Сохранить ключ");save.setOnClickListener(v->{prefs.edit().putString("vision_key",k.getText().toString().trim()).apply();cameraGate();});cfg.addView(save);content.addView(cfg);
+            Button demo=ghost("Демонстрация локального распознавания");demo.setOnClickListener(v->startRealtimeCamera());content.addView(demo);
+            return;
+        }
         if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){
             Button ask=btn("Разрешить камеру");ask.setOnClickListener(v->ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.CAMERA},44));content.addView(ask);return;
         }
@@ -495,6 +506,8 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         PreviewView preview=new PreviewView(this);preview.setScaleType(PreviewView.ScaleType.FILL_CENTER);
         content.addView(preview,new LinearLayout.LayoutParams(-1,dp(430)));
         TextView label=serif("Наведи камеру на предмет",25,true);label.setGravity(Gravity.CENTER);label.setBackground(bg(Color.argb(220,255,255,255),18));content.addView(label);
+        Button speakDetected=ghost("🔊 Произнести немецкое слово");speakDetected.setOnClickListener(v->{if(!lastCloudWord.isEmpty())toggleSpeak("camera_word",lastCloudWord,speakDetected);});content.addView(speakDetected);
+        content.addView(tv(prefs.getString("vision_key","").isEmpty()?"Демо: общая классификация на устройстве":"Облако: точное распознавание раз в несколько секунд",13,false));
 
         ListenableFuture<ProcessCameraProvider> f=ProcessCameraProvider.getInstance(this);
         f.addListener(()->{
@@ -503,16 +516,78 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
                 Preview p=new Preview.Builder().build();p.setSurfaceProvider(preview.getSurfaceProvider());
                 ImageAnalysis an=new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
                 an.setAnalyzer(cameraExecutor,img->{
-                    long now=System.currentTimeMillis();if(now-lastAnalysis<700){img.close();return;}lastAnalysis=now;
-                    android.media.Image media=img.getImage(); if(media==null){img.close();return;}
-                    InputImage in=InputImage.fromMediaImage(media,img.getImageInfo().getRotationDegrees());
-                    ImageLabeling.getClient(new ImageLabelerOptions.Builder().setConfidenceThreshold(.55f).build()).process(in)
-                            .addOnSuccessListener(ls->{if(!ls.isEmpty()){String en=ls.get(0).getText();String de=toGerman(en);runOnUiThread(()->label.setText(de+"\n"+en+" • "+Math.round(ls.get(0).getConfidence()*100)+"%"));}})
+                    long now=System.currentTimeMillis();
+                    boolean cloud=!prefs.getString("vision_key","").isEmpty();
+                    if(now-lastAnalysis<(cloud?3500:850)||cloudBusy){img.close();return;}
+                    lastAnalysis=now;
+                    android.media.Image media=img.getImage();if(media==null){img.close();return;}
+                    InputImage input=InputImage.fromMediaImage(media,img.getImageInfo().getRotationDegrees());
+                    if(cloud){
+                        cloudBusy=true;
+                        Bitmap bitmap=toBitmap(img);
+                        img.close();
+                        if(bitmap==null){cloudBusy=false;return;}
+                        cloudRecognize(bitmap,label);
+                    }else{
+                        ImageLabeling.getClient(new ImageLabelerOptions.Builder().setConfidenceThreshold(.55f).build()).process(input)
+                            .addOnSuccessListener(ls->{if(!ls.isEmpty()){String en=ls.get(0).getText();String de=toGerman(en);
+                                lastCloudWord=de.startsWith("Найдено")?"":de;
+                                runOnUiThread(()->label.setText(de+"\\n"+en+" • "+Math.round(ls.get(0).getConfidence()*100)+"%"));}})
                             .addOnCompleteListener(x->img.close());
+                    }
                 });
                 provider.unbindAll();provider.bindToLifecycle(this,CameraSelector.DEFAULT_BACK_CAMERA,p,an);
             }catch(Exception e){toast("Камера: "+e.getMessage());}
         },ContextCompat.getMainExecutor(this));
+    }
+
+
+    Bitmap toBitmap(ImageProxy image){
+        try{
+            android.media.Image m=image.getImage(); if(m==null)return null;
+            android.media.Image.Plane[] planes=m.getPlanes();
+            java.nio.ByteBuffer y=planes[0].getBuffer(),u=planes[1].getBuffer(),v=planes[2].getBuffer();
+            int width=image.getWidth(),height=image.getHeight();
+            byte[] nv21=new byte[width*height*3/2];
+            for(int row=0;row<height;row++)for(int col=0;col<width;col++)nv21[row*width+col]=y.get(row*planes[0].getRowStride()+col*planes[0].getPixelStride());
+            int offset=width*height;
+            for(int row=0;row<height/2;row++)for(int col=0;col<width/2;col++){
+                nv21[offset++]=v.get(row*planes[2].getRowStride()+col*planes[2].getPixelStride());
+                nv21[offset++]=u.get(row*planes[1].getRowStride()+col*planes[1].getPixelStride());
+            }
+            android.graphics.YuvImage yy=new android.graphics.YuvImage(nv21,android.graphics.ImageFormat.NV21,width,height,null);
+            ByteArrayOutputStream os=new ByteArrayOutputStream();yy.compressToJpeg(new android.graphics.Rect(0,0,width,height),67,os);
+            Bitmap b=BitmapFactory.decodeByteArray(os.toByteArray(),0,os.size());
+            android.graphics.Matrix matrix=new android.graphics.Matrix();matrix.postRotate(image.getImageInfo().getRotationDegrees());
+            return Bitmap.createBitmap(b,0,0,b.getWidth(),b.getHeight(),matrix,true);
+        }catch(Exception ex){return null;}
+    }
+    void cloudRecognize(Bitmap bitmap,TextView label){
+        cameraExecutor.execute(()->{
+            java.net.HttpURLConnection conn=null;
+            try{
+                ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+                Bitmap scaled=Bitmap.createScaledBitmap(bitmap,Math.min(640,bitmap.getWidth()),Math.min(640,bitmap.getHeight()),true);
+                scaled.compress(Bitmap.CompressFormat.JPEG,65,bytes);
+                String encoded=android.util.Base64.encodeToString(bytes.toByteArray(),android.util.Base64.NO_WRAP);
+                JSONObject inline=new JSONObject().put("mime_type","image/jpeg").put("data",encoded);
+                JSONArray parts=new JSONArray().put(new JSONObject().put("text","Identify the most prominent physical everyday object. Respond ONLY one line with German noun including definite article, IPA pronunciation, Russian translation separated by |. If unclear: unbekannt|?|не определено. Be precise for headphones, computer mouse, keyboard." )).put(new JSONObject().put("inline_data",inline));
+                JSONObject body=new JSONObject().put("contents",new JSONArray().put(new JSONObject().put("parts",parts)));
+                java.net.URL url=new java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+                conn=(java.net.HttpURLConnection)url.openConnection();conn.setRequestMethod("POST");
+                conn.setRequestProperty("x-goog-api-key",prefs.getString("vision_key",""));
+                conn.setRequestProperty("Content-Type","application/json");conn.setConnectTimeout(12000);conn.setReadTimeout(18000);conn.setDoOutput(true);
+                byte[] json=body.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);conn.getOutputStream().write(json);
+                if(conn.getResponseCode()!=200)throw new IOException("API HTTP "+conn.getResponseCode());
+                ByteArrayOutputStream output=new ByteArrayOutputStream();InputStream input=conn.getInputStream();byte[] buf=new byte[4096];int read;while((read=input.read(buf))!=-1)output.write(buf,0,read);
+                JSONObject answer=new JSONObject(output.toString("UTF-8"));
+                String raw=answer.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text").trim();
+                String[] pieces=raw.split("\\|");
+                lastCloudWord=pieces.length>0?pieces[0].trim():"";
+                runOnUiThread(()->label.setText(raw.replace("|","\\n")));
+            }catch(Exception ex){runOnUiThread(()->label.setText("Нет ответа от облачной модели: "+ex.getMessage()));}
+            finally{if(conn!=null)conn.disconnect();cloudBusy=false;}
+        });
     }
 
     String toGerman(String en){
