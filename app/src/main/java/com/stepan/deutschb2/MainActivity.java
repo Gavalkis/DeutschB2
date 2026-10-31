@@ -41,7 +41,7 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
     boolean ttsReady=false;
     String speakingKey="";
     ArrayList<Word> words=new ArrayList<>();
-    JSONArray lessons;
+    JSONArray lessons, guides;
     SharedPreferences prefs;
     int currentTab=0;
     int speechLesson=-1, speechExample=-1;
@@ -65,7 +65,7 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
 
     void loadData(){
         try{
-            lessons=new JSONArray(readAsset("lessons.json"));
+            lessons=new JSONArray(readAsset("lessons.json")); guides=new JSONArray(readAsset("lesson_guides.json"));
             BufferedReader br=new BufferedReader(new InputStreamReader(getAssets().open("words.csv")));
             String s; br.readLine();
             while((s=br.readLine())!=null){
@@ -137,9 +137,9 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         root.addView(sv,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout nav=new LinearLayout(this);nav.setPadding(dp(4),dp(4),dp(4),dp(4));nav.setBackgroundColor(Color.WHITE);
-        String[] tabs={"Сегодня","Словарь","Маршрут","Практика","Камера"};
+        String[] tabs={"Дом","Слова","Уроки","Задания","Камера"};
         for(int i=0;i<tabs.length;i++){
-            final int ix=i;Button b=ghost(tabs[i]);b.setTextSize(11);
+            final int ix=i;Button b=ghost(tabs[i]);b.setTextSize(10);b.setSingleLine(true);b.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if(i==tab){ b.setTextColor(Color.WHITE); b.setBackground(bg(GREEN,16)); }
             b.setOnClickListener(v->showShell(ix));
             LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(58),1);lp.setMargins(dp(2),0,dp(2),0);nav.addView(b,lp);
@@ -254,12 +254,21 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
     }
 
     void lesson(int ix){
-        stopAudio(); content.removeAllViews();
+        stopAudio(); showShell(2); content.removeAllViews();
         try{
             JSONObject o=lessons.getJSONObject(ix);
             headline(o.getString("level")+" • урок "+(ix+1),o.getString("title"),null);
 
-            LinearLayout theory=card();theory.addView(tv("Теория",18,true));theory.addView(tv(o.getString("theory"),16,false));content.addView(theory);
+            LinearLayout theory=card();theory.addView(tv("Разбор правила",18,true));
+            JSONObject guide=guides.getJSONObject(ix);
+            theory.addView(tv(guide.getString("why"),16,false));
+            TextView formula=tv(guide.getString("formula"),15,true);formula.setBackground(bg(PALE,14));theory.addView(formula);
+            JSONArray table=guide.getJSONArray("table");
+            for(int rr=0;rr<table.length();rr++){
+                JSONArray cells=table.getJSONArray(rr);LinearLayout line=new LinearLayout(this);line.setBackground(bg(rr==0?PALE:rr%2==0?CREAM:Color.WHITE,6));
+                for(int cc=0;cc<cells.length();cc++){TextView x=tv(cells.getString(cc),rr==0?12:13,rr==0);x.setPadding(dp(5),dp(8),dp(5),dp(8));line.addView(x,new LinearLayout.LayoutParams(0,-2,1));}theory.addView(line);
+            }
+            theory.addView(tv("Запомни: "+guide.getString("tip"),14,true));theory.addView(tv(o.getString("theory"),15,false));content.addView(theory);
 
             JSONArray a=o.getJSONArray("examples");
             for(int i=0;i<a.length();i++){
@@ -272,7 +281,7 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
             }
 
             LinearLayout hint=card();hint.setBackground(bg(PALE,22));hint.addView(tv("Как закрепляем",17,true));
-            hint.addView(tv("После практики правило вернётся через 10 минут, затем через 30 минут, 1 ч, 3 ч, 6 ч, 1 день, 3, 10, 20 и 30 дней.",14,false));content.addView(hint);
+            hint.addView(tv("Пройденные слова и правила будут регулярно возвращаться в следующих уроках.",14,false));content.addView(hint);
 
             Button p=btn("Пройти практику по этой теме");p.setOnClickListener(v->topicPractice(ix,0,0));content.addView(p);
         }catch(Exception e){toast(e.getMessage());}
@@ -282,14 +291,16 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         stopAudio(); content.removeAllViews();
         try{
             JSONObject o=lessons.getJSONObject(lessonIx);JSONArray ex=o.getJSONArray("examples");
-            int total=Math.max(4,Math.min(7,ex.length()+3));
+            int total=7;
             if(step>=total){finishLessonPractice(lessonIx,score,total);return;}
             headline("Практика "+(step+1)+"/"+total,o.getString("title"),"Задания создаются только по текущей теме и её примерам.");
 
-            int mode=step%4; String[] ep=ex.getString(step%ex.length()).split("\\|",2);
+            int mode=step%6; String[] ep=ex.getString(step%ex.length()).split("\\|",2);
             if(mode==0) multipleChoice(lessonIx,step,score,total,ep);
             else if(mode==1) translateTask(lessonIx,step,score,total,ep);
             else if(mode==2) listeningTask(lessonIx,step,score,total,ep);
+            else if(mode==3) clozeTask(lessonIx,step,score,total,ep);
+            else if(mode==4) reorderTask(lessonIx,step,score,total,ep);
             else structureTask(lessonIx,step,score,total,ep);
         }catch(Exception e){toast(e.getMessage());}
     }
@@ -315,6 +326,34 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         EditText in=new EditText(this);in.setHint("Немецкая фраза");in.setBackground(bg(Color.WHITE,18));content.addView(in);
         TextView result=tv("",15,false);content.addView(result);
         Button check=btn("Проверить");check.setOnClickListener(v->{boolean ok=similar(normalize(in.getText().toString()),normalize(ep[0]))>.82;result.setText(ok?"✓ Хорошо":"Фраза была:\n"+ep[0]+"\n"+(ep.length>1?ep[1]:""));check.setText("Дальше");check.setOnClickListener(z->topicPractice(li,step+1,score+(ok?1:0)));});content.addView(check);
+    }
+
+    void clozeTask(int li,int step,int score,int total,String[] ep){
+        String original=ep[0];String[] chunks=original.replaceAll("[.!?]","").split(" ");
+        int target=Math.min(chunks.length-1,Math.max(0,chunks.length/2));String answer=chunks[target];chunks[target]="_____";
+        headline("Вставь слово","Заполни пропуск",ep.length>1?ep[1]:"");
+        LinearLayout c=card();c.addView(serif(String.join(" ",chunks),23,true));content.addView(c);
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("Какое слово пропущено?");content.addView(input);
+        TextView result=tv("",16,false);content.addView(result);
+        Button check=btn("Проверить");check.setOnClickListener(v->{
+            boolean ok=normalize(input.getText().toString()).equals(normalize(answer));
+            result.setText((ok?"✓ Верно!":"Правильно: "+answer)+"\\n"+original+"\\n"+(ep.length>1?ep[1]:""));
+            check.setText("Дальше");check.setOnClickListener(x->topicPractice(li,step+1,score+(ok?1:0)));
+        });content.addView(check);
+    }
+
+    void reorderTask(int li,int step,int score,int total,String[] ep){
+        headline("Собери предложение","Расставь слова",ep.length>1?ep[1]:"");
+        ArrayList<String> parts=new ArrayList<>(Arrays.asList(ep[0].replaceAll("[.!?]","").split(" ")));
+        Collections.shuffle(parts);
+        TextView built=serif("...",22,true);content.addView(built);
+        ArrayList<String> chosen=new ArrayList<>();LinearLayout opts=card();opts.addView(tv("Нажимай слова по порядку:",15,true));
+        for(String word:parts){Button b=ghost(word);b.setOnClickListener(v->{chosen.add(word);b.setEnabled(false);b.setAlpha(.4f);built.setText(String.join(" ",chosen));});opts.addView(b);}content.addView(opts);
+        TextView result=tv("",15,false);content.addView(result);
+        Button check=btn("Проверить");check.setOnClickListener(v->{
+            boolean ok=normalize(String.join(" ",chosen)).equals(normalize(ep[0]));
+            result.setText(ok?"✓ Верно!":"Правильно: "+ep[0]);check.setText("Дальше");check.setOnClickListener(x->topicPractice(li,step+1,score+(ok?1:0)));
+        });content.addView(check);
     }
 
     void structureTask(int li,int step,int score,int total,String[] ep){
