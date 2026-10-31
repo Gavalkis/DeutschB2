@@ -411,13 +411,30 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
     }
 
     void startExam(String level){
-        stopAudio();content.removeAllViews();headline("Контрольный "+level,"Мини-экзамен","Смешанная проверка слов, понимания структуры и тем уровня.");
-        int score=0,total=5;Random r=new Random();
-        for(int i=0;i<total;i++){
-            Word w=words.get(r.nextInt(words.size()));
-            LinearLayout c=card();c.addView(tv((i+1)+". "+w.ru,16,true));c.addView(tv("Вспомни: "+w.article+" "+w.word+" • пример: "+w.de,14,false));content.addView(c);
+        examQuestion(level,0,0);
+    }
+    void examQuestion(String level,int index,int score){
+        stopAudio();showShell(2);content.removeAllViews();
+        final int max=10;
+        if(index>=max){
+            int percent=score*100/max;
+            headline("Контрольная "+level,"Результат: "+percent+"%","Пройдено правильно: "+score+" из "+max);
+            LinearLayout card=card();card.addView(tv(percent>=80?"✓ Уровень закреплён":"Повтори слабые места, затем пройди контрольную снова",18,true));content.addView(card);
+            if(percent>=80)prefs.edit().putBoolean("exam_"+level,true).apply();
+            Button b=btn("Вернуться к маршруту");b.setOnClickListener(v->showShell(2));content.addView(b);return;
         }
-        Button done=btn("Я повторил задания");done.setOnClickListener(v->{toast("Контрольный блок завершён. Следующие уроки доступны по маршруту.");showShell(2);});content.addView(done);
+        ArrayList<Word> candidates=new ArrayList<>();for(Word w:words)if(w.level.compareTo(level)<=0)candidates.add(w);
+        if(candidates.isEmpty())candidates.addAll(words);
+        Word w=candidates.get((index*7+3)%candidates.size());
+        headline("Мини-экзамен "+level,"Задание "+(index+1)+" из "+max,"Напиши слово вместе с артиклем. Прогресс сохраняется после завершения.");
+        LinearLayout c=card();c.addView(serif(w.ru,26,true));content.addView(c);
+        EditText input=new EditText(this);input.setSingleLine(true);input.setHint("der / die / das + слово");content.addView(input);
+        TextView feedback=tv("",15,false);content.addView(feedback);
+        Button b=btn("Проверить");b.setOnClickListener(v->{
+            boolean correct=normalize(input.getText().toString()).equals(normalize(w.article+" "+w.word));
+            feedback.setText((correct?"✓ Верно":"Правильно: "+w.article+" "+w.word)+"\\n"+w.de+" - "+w.exru);
+            b.setText("Следующее");b.setOnClickListener(x->examQuestion(level,index+1,score+(correct?1:0)));
+        });content.addView(b);
     }
 
     void toggleSpeak(String key,String text,Button b){
