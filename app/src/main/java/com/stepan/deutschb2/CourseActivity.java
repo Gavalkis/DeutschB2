@@ -14,7 +14,7 @@ import java.util.*;
 
 public class CourseActivity extends Activity implements TextToSpeech.OnInitListener {
  final int BG=0xfff6f7f2, NAVY=0xff142b28, GREEN=0xff256c55, LIGHT=0xffe6efe7, MUTED=0xff647873, WHITE=0xffffffff, RED=0xffb93a4a, GOLD=0xffffc84d;
- LinearLayout root,body,bottom; ScrollView scroll; TextToSpeech tts; boolean voiceReady=false; String speaking="";
+ LinearLayout root,body,bottom; ScrollView scroll; TextToSpeech tts; boolean voiceReady=false; String speaking=""; android.media.ToneGenerator feedbackTone=new android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC,32);
  JSONArray guides,lessons,bank; android.content.SharedPreferences prefs;
  int page=0,unit=0,stage=0,qindex=0,score=0; boolean exam=false,answered=false,repairMode=false,fromSpeech=false; String chosen="",expected="",expectedRu="";
  LearningEngine.Store store; ArrayList<Integer> wrong=new ArrayList<>(); ArrayList<Integer> repairs=new ArrayList<>(); long sessionStarted; int lastSpeechIndex=-1;
@@ -93,11 +93,11 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  for(int i=0;i<24;i++){final int idx=i;try{JSONObject l=lessons.getJSONObject(i);LinearLayout c=card();boolean open=i<=Math.max(done(),23==i?done():0);c.setAlpha(open?1:.48f);
  TextView lab=small(level(i)+"  ·  УРОК "+(i+1)+(prefs.getBoolean("complete_"+i,false)?"   ✓ ПРОЙДЕН":""));add(c,lab,8);add(c,title(l.getString("title"),19),9);
  add(c,small(open?"Теория → примеры → практика":"Откроется после предыдущего урока"),12);
- if(open)add(c,button(prefs.getBoolean("complete_"+i,false)?"ПОВТОРИТЬ":"НАЧАТЬ",true,()->openLesson(idx)),0);add(body,c,13);
+ if(open)add(c,button(prefs.getBoolean("complete_"+i,false)?"ПОВТОРИТЬ":"НАЧАТЬ",true,()->{c.animate().scaleX(.97f).scaleY(.97f).setDuration(95).withEndAction(()->openLesson(idx)).start();}),0);add(body,c,13);
  if(i==8||i==17||i==20||i==23){final int bound=i;add(body,button("◈ ПРОВЕРКА УРОВНЯ "+level(i),false,()->startExam(bound)),17);}
  }catch(Exception ignored){}}
  }
- void openLesson(int i){unit=i;stage=0;showTheory();overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);}
+ void openLesson(int i){unit=i;stage=0;showTheory();body.setAlpha(0f);body.animate().alpha(1f).setDuration(230).start();}
  void showTheory(){layout(false);try{JSONObject g=guides.getJSONObject(unit),l=lessons.getJSONObject(unit);
  header(level(unit)+" · УРОК "+(unit+1),"Разберём правило","Шаг "+(stage+1)+" из 3  •  Сначала пойми логику.");
  LinearLayout c=card();
@@ -148,7 +148,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  add(body,grid,10);buttonArea(de);}
  void inputQuestion(String hint,String correct){EditText field=new EditText(this);field.setTextColor(WHITE);field.setHintTextColor(0xffa7b9b3);field.setHint(hint);field.setTextSize(18);field.setMinLines(2);field.setBackground(shape(0xff263e39,16));field.setPadding(d(18),d(15),d(18),d(15));add(body,field,20);
  bottom.removeAllViews();add(bottom,button("ПРОВЕРИТЬ",true,()->{chosen=field.getText().toString();feedback(normal(chosen).equals(normal(correct)),correct);}),0);}
- void feedback(boolean ok,String solution){if(answered)return;answered=true;if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
+ void feedback(boolean ok,String solution){if(answered)return;answered=true;feedbackTone.startTone(ok?android.media.ToneGenerator.TONE_PROP_ACK:android.media.ToneGenerator.TONE_PROP_NACK,95);if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
  bottom.removeAllViews();TextView msg=text((ok?"✓ Отлично!":"Правильный ответ:")+" \n"+solution+"\n"+expectedRu,16,true);msg.setTextColor(ok?GREEN:RED);msg.setPadding(d(12),d(10),d(12),d(12));msg.setBackground(shape(ok?LIGHT:0xffffeded,13));add(bottom,msg,10);
  add(bottom,button("ПРОДОЛЖИТЬ",true,()->next(ok)),0);
  }
@@ -266,5 +266,5 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  lastSpeechIndex=qindex;try{startActivityForResult(intent,63);}catch(Exception e){new AlertDialog.Builder(this).setMessage("Распознавание речи недоступно без установленной службы Android Speech.").setPositiveButton("OK",null).show();}}
  @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==63&&result==RESULT_OK&&data!=null){ArrayList<String> txt=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);if(txt!=null&&!txt.isEmpty()){String heard=txt.get(0);int pct=(int)Math.round(LearningEngine.similarity(expected,heard)*100);boolean ok=LearningEngine.acceptedSpeech(expected,heard);feedback(ok,expected);new AlertDialog.Builder(this).setTitle("Совпадение: "+pct+"%"+(ok?" ✓":"")).setMessage("Распознано: "+heard+"\nЭталон: "+expected+"\n"+(ok?"Порог 70% пройден.":"Попробуй ещё раз в конце урока.")).setPositiveButton("Понятно",null).show();}}}
  @Override protected void onPause(){stopAudio();super.onPause();}
- @Override protected void onDestroy(){stopAudio();if(tts!=null)tts.shutdown();super.onDestroy();}
+ @Override protected void onDestroy(){stopAudio();if(tts!=null)tts.shutdown();if(feedbackTone!=null)feedbackTone.release();store.addSession(System.currentTimeMillis()-sessionStarted);super.onDestroy();}
 }
