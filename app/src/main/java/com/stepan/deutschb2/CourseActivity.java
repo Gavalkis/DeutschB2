@@ -260,7 +260,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
      cv.restore();
    }
  }
- void camera(){header("WÖRTER UM MICH","Камера и перевод","Для распознавания предметов понадобится интернет и настроенный ключ облачного сервиса.");LinearLayout c=card();add(c,text("В этом выпуске модуль распознавания открывается отдельно, чтобы обучение и проверка ответов работали без интернета.",16,false),15);add(c,button("ОТКРЫТЬ КАМЕРУ",true,()->{Intent intent=new Intent(this,MainActivity.class);intent.putExtra("camera",true);startActivity(intent);}),0);add(body,c,12);}
+ void camera(){header("WÖRTER UM MICH","Камера и перевод","Для распознавания предметов понадобится интернет и настроенный ключ облачного сервиса.");LinearLayout c=card();add(c,text("В этом выпуске модуль распознавания открывается отдельно, чтобы обучение и проверка ответов работали без интернета.",16,false),15);add(c,button("ОТКРЫТЬ КАМЕРУ",true,()->{Intent intent=new Intent(this,CameraActivity.class);startActivity(intent);}),0);add(body,c,12);}
  void startExam(int end){startPractice(end,true);}
  void recognize(String target){Intent intent=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,"de-DE");intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
  lastSpeechIndex=qindex;try{startActivityForResult(intent,63);}catch(Exception e){new AlertDialog.Builder(this).setMessage("Распознавание речи недоступно без установленной службы Android Speech.").setPositiveButton("OK",null).show();}}
