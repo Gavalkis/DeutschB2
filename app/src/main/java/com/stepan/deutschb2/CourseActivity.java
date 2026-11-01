@@ -37,7 +37,28 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  LinearLayout card(){LinearLayout c=vertical();pad(c,18);c.setBackground(shape(WHITE,22));return c;}
  void add(LinearLayout p,View v,int space){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,0,0,d(space));p.addView(v,lp);}
  TextView small(String s){TextView t=text(s,14,false);t.setTextColor(MUTED);return t;}
- TextView button(String s,boolean primary,Runnable action){TextView b=text(s,16,true);b.setTextColor(primary?WHITE:NAVY);b.setGravity(Gravity.CENTER);b.setMinHeight(d(54));b.setPadding(d(14),d(12),d(14),d(12));b.setBackground(shape(primary?GREEN:LIGHT,15));b.setOnClickListener(v->action.run());return b;}
+ TextView button(String s,boolean primary,Runnable action){
+ TextView b=text(s,16,true);b.setTextColor(primary?WHITE:NAVY);b.setGravity(Gravity.CENTER);
+ b.setMinHeight(d(54));b.setPadding(d(14),d(12),d(14),d(12));
+ android.graphics.drawable.GradientDrawable face=shape(primary?GREEN:LIGHT,15);
+ b.setBackground(face);b.setElevation(d(4));b.setStateListAnimator(null);
+ pressFeedback(b,action);return b;
+}
+void pressFeedback(View b,Runnable action){
+ b.setOnTouchListener((v,e)->{
+   if(e.getAction()==MotionEvent.ACTION_DOWN){
+     v.animate().cancel();v.animate().scaleX(.965f).scaleY(.948f).translationY(d(2)).setDuration(75).start();
+   }else if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL){
+     v.animate().cancel();v.animate().scaleX(1).scaleY(1).translationY(0).setDuration(145).setInterpolator(new android.view.animation.OvershootInterpolator(.65f)).start();
+   }
+   return false;
+ });
+ b.setOnClickListener(v->{if(!v.isEnabled())return;v.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);action.run();});
+}
+void enterAnimation(){
+  if(body!=null){body.setAlpha(0f);body.setTranslationX(d(18));body.animate().alpha(1).translationX(0).setDuration(235).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();}
+}
+
  void stopAudio(){if(tts!=null)tts.stop();speaking="";}
  void talk(String k,String phrase){if(k.equals(speaking)){stopAudio();return;}stopAudio();speaking=k;if(voiceReady)tts.speak(phrase,TextToSpeech.QUEUE_FLUSH,null,k);}
  public void onInit(int status){if(status==TextToSpeech.SUCCESS){voiceReady=true;tts.setLanguage(Locale.GERMANY);}}
@@ -99,6 +120,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  void openLesson(int i){unit=i;stage=0;showTheory();body.setAlpha(0f);body.animate().alpha(1f).setDuration(230).start();}
  void showTheory(){layout(false);try{JSONObject g=guides.getJSONObject(unit),l=lessons.getJSONObject(unit);
+ LinearLayout backRow=horizontal();TextView back=text("‹  Назад",16,true);back.setTextColor(GREEN);back.setPadding(d(7),d(8),d(8),d(14));backRow.addView(back);back.setOnClickListener(v->previousTheory());add(body,backRow,10);
  header(level(unit)+" · УРОК "+(unit+1),"Разберём правило","Шаг "+(stage+1)+" из 3  •  Сначала пойми логику.");
  LinearLayout c=card();
  if(stage==0){add(c,title(l.getString("title"),24),13);add(c,text(g.getString("why"),16,false),14);
@@ -111,7 +133,9 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  add(body,c,20);
  add(bottom,button(stage<2?"ДАЛЬШЕ →":"ПРАКТИКА ПО ТЕМЕ →",true,()->{if(stage<2){stage++;showTheory();}else startPractice(unit,false);}),0);
- }catch(Exception e){Toast.makeText(this,e.toString(),1).show();}}
+ }catch(Exception e){Toast.makeText(this,e.toString(),1).show();}enterAnimation();}
+ void previousTheory(){if(stage>0){stage--;showTheory();}else draw(1);}
+ @Override public void onBackPressed(){if(page==1&&stage>0){previousTheory();return;}if(page==1){draw(1);return;}super.onBackPressed();}
  void startPractice(int topic,boolean isExam){unit=topic;exam=isExam;qindex=0;score=0;repairMode=false;wrong.clear();repairs.clear();questionOrder.clear();
  int n=isExam?15:10;for(int i=0;i<n;i++)questionOrder.add(i);showQuestion();}
  JSONObject item(int at)throws Exception{int idx=(at*3+(unit%4))%bank.getJSONObject(unit).getJSONArray("items").length();return bank.getJSONObject(unit).getJSONArray("items").getJSONObject(idx);}
@@ -135,7 +159,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  else if(type==6){addGermanPrompt(de,16);add(body,button("🔊  СЛУШАТЬ",false,()->talk("say"+qindex,de)),14);add(body,button("🎙  ПРОИЗНЕСТИ",false,()->recognize(de)),12);
  add(body,smallLight("После распознавания приложение сравнит текст с эталоном. Порог: 70%."),0);}
  else {String erroneous=makeError(de,focus);addGermanPrompt(erroneous,12);inputQuestion("Исправь ошибку в предложении",de);}
- }catch(Exception e){Toast.makeText(this,e.toString(),1).show();}
+ }catch(Exception e){Toast.makeText(this,e.toString(),1).show();}enterAnimation();
  }
  TextView titleLight(String s){TextView t=title(s,22);t.setTextColor(WHITE);return t;}
  TextView smallLight(String s){TextView t=small(s);t.setTextColor(0xffb7ccc5);return t;}
@@ -159,11 +183,51 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  void choiceList(ArrayList<String> options,String answer){LinearLayout list=vertical();for(String x:options){TextView b=text(x,17,false);b.setPadding(d(18),d(20),d(14),d(20));b.setBackground(shape(0xff263e39,16));b.setTextColor(WHITE);add(list,b,10);b.setOnClickListener(v->{chosen=x;for(int j=0;j<list.getChildCount();j++){View z=list.getChildAt(j);z.setBackground(shape(z==b?GREEN:0xff263e39,16));}buttonArea(answer);});}add(body,list,20);buttonArea(answer);}
  void buttonArea(String answer){bottom.removeAllViews();add(bottom,button("ДАЛЕЕ →",true,()->{if(answered){next(true);}else{feedback(normal(chosen).equals(normal(answer)),answer);}}),0);}
- void wordBank(String de){ArrayList<String> parts=new ArrayList<>(Arrays.asList(de.replaceAll("[.!?]","").split(" ")));Collections.shuffle(parts);
- TextView output=titleLight("...");add(body,output,23);LinearLayout grid=vertical();ArrayList<String> built=new ArrayList<>();
- for(String word:parts){TextView choice=text(word,17,false);choice.setTextColor(WHITE);choice.setPadding(d(15),d(12),d(15),d(12));choice.setBackground(shape(0xff273f39,12));add(grid,choice,7);
- choice.setOnClickListener(v->{built.add(word);choice.setVisibility(View.GONE);chosen=String.join(" ",built);output.setText(chosen);});}
- add(body,grid,10);buttonArea(de);}
+
+ void wordBank(String de){
+   ArrayList<String> source=new ArrayList<>(Arrays.asList(de.replaceAll("[.!?]","").split("\\s+")));
+   ArrayList<Integer> shuffled=new ArrayList<>();for(int i=0;i<source.size();i++)shuffled.add(i);Collections.shuffle(shuffled);
+   ArrayList<Integer> selected=new ArrayList<>();
+   TextView info=smallLight("Нажми на слово, чтобы добавить. Нажми на выбранное слово, чтобы вернуть.");
+   add(body,info,13);
+   LinearLayout answerLine=vertical(),available=vertical();
+   answerLine.setPadding(d(8),d(10),d(8),d(12));answerLine.setMinimumHeight(d(105));
+   answerLine.setBackground(shape(0xff25413a,15));
+   add(body,answerLine,16);add(body,available,8);
+   Runnable[] redraw=new Runnable[1];
+   redraw[0]=()->{
+     answerLine.removeAllViews();available.removeAllViews();
+     if(selected.isEmpty()){TextView placeholder=smallLight("Нажимай на слова ниже");add(answerLine,placeholder,13);}
+     LinearLayout row=null;int i=0;
+     for(int wordId:selected){
+       if(i%3==0){row=horizontal();row.setGravity(Gravity.CENTER_VERTICAL);add(answerLine,row,9);}
+       TextView token=tokenButton(source.get(wordId),true);
+       LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,d(54),1);p.setMargins(d(4),0,d(4),0);row.addView(token,p);
+       final int remove=wordId;
+       pressFeedback(token,()->{if(answered)return;selected.remove(Integer.valueOf(remove));redraw[0].run();});
+       token.setAlpha(0);token.setScaleX(.84f);token.setScaleY(.84f);
+       token.animate().alpha(1).scaleX(1).scaleY(1).setDuration(180).setInterpolator(new android.view.animation.OvershootInterpolator()).start();
+       i++;
+     }
+     row=null;i=0;
+     for(int id:shuffled){if(selected.contains(id))continue;
+       if(i%3==0){row=horizontal();row.setGravity(Gravity.CENTER_VERTICAL);add(available,row,9);}
+       TextView token=tokenButton(source.get(id),false);
+       LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,d(56),1);p.setMargins(d(4),0,d(4),0);row.addView(token,p);
+       final int addId=id;pressFeedback(token,()->{if(answered)return;selected.add(addId);redraw[0].run();});
+       i++;
+     }
+     ArrayList<String> built=new ArrayList<>();for(int id:selected)built.add(source.get(id));
+     chosen=String.join(" ",built);
+   };
+   redraw[0].run();
+   buttonArea(de);
+ }
+ TextView tokenButton(String word,boolean active){
+   TextView view=text(word,17,true);view.setGravity(Gravity.CENTER);view.setTextColor(active?NAVY:WHITE);
+   view.setPadding(d(3),d(5),d(3),d(5));view.setBackground(shape(active?0xffdbece4:0xff33534a,13));
+   view.setElevation(d(2));return view;
+ }
  void inputQuestion(String hint,String correct){EditText field=new EditText(this);field.setTextColor(WHITE);field.setHintTextColor(0xffa7b9b3);field.setHint(hint);field.setTextSize(18);field.setMinLines(2);field.setBackground(shape(0xff263e39,16));field.setPadding(d(18),d(15),d(18),d(15));add(body,field,20);
  bottom.removeAllViews();add(bottom,button("ДАЛЕЕ →",true,()->{chosen=field.getText().toString();feedback(normal(chosen).equals(normal(correct)),correct);}),0);}
 
