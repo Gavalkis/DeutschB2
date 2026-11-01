@@ -146,7 +146,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
  String[] n={"Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
- for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->mode.equals("Письмо и перевод")?writing():startPractice(Math.min(done(),22),false)),0);add(body,c,12);}
+ for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
  }
  void camera(){header("WÖRTER UM MICH","Камера и перевод","Для распознавания предметов понадобится интернет и настроенный ключ облачного сервиса.");LinearLayout c=card();add(c,text("В этом выпуске модуль распознавания открывается отдельно, чтобы обучение и проверка ответов работали без интернета.",16,false),15);add(c,button("ОТКРЫТЬ КАМЕРУ",true,()->{Intent intent=new Intent(this,MainActivity.class);intent.putExtra("camera",true);startActivity(intent);}),0);add(body,c,12);}
  void startExam(int end){startPractice(end,true);}
