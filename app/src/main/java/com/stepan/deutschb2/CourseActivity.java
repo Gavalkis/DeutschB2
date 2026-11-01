@@ -200,7 +200,30 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  boolean pass=wrong.isEmpty()||repairMode;if(pass&&!exam){store.complete(unit);prefs.edit().putBoolean("complete_"+unit,true).putInt("unlocked",Math.max(done(),unit+1)).apply();}
  add(bottom,button("НАЗАД К МАРШРУТУ",true,()->draw(1)),0);
  }
- void dictionary(){header("WÖRTER","Словарь","Слова с родом, множественным числом и переводом. Для повторения используй практику.");
+
+ ArrayList<String[]> vocabulary=new ArrayList<>();
+ int cardIndex=0;boolean cardRevealed=false,cardRuToDe=false;
+ void readVocabulary(){
+  if(!vocabulary.isEmpty())return;
+  try{java.io.BufferedReader r=new java.io.BufferedReader(new java.io.InputStreamReader(getAssets().open("words.csv")));
+   String line;r.readLine();while((line=r.readLine())!=null){String[] p=line.split(";",-1);if(p.length>=7)vocabulary.add(p);}
+  }catch(Exception ignored){}
+ }
+ void flashcard(){readVocabulary();if(vocabulary.isEmpty()){draw(2);return;}layout(false);
+   header("KARTEIKARTEN","Вспоминай активно","Переверни карточку, затем обязательно введи перевод.");
+   String[] w=vocabulary.get(cardIndex%vocabulary.size());cardRuToDe=(cardIndex%2==1);String front=cardRuToDe?w[4]:w[1]+" "+w[2],back=cardRuToDe?(w[1]+" "+w[2]):w[4];
+   LinearLayout c=card();c.setMinimumHeight(d(230));c.setGravity(Gravity.CENTER);
+   TextView face=title(front,28);face.setGravity(Gravity.CENTER);add(c,face,15);
+   TextView clue=small("Нажми, чтобы перевернуть");clue.setGravity(Gravity.CENTER);add(c,clue,0);
+   c.setOnClickListener(v->{cardRevealed=!cardRevealed;face.setText(cardRevealed?back:front);});
+   add(body,c,20);
+   EditText in=new EditText(this);in.setSingleLine(true);in.setHint(cardRuToDe?"Артикль + слово по-немецки":"Перевод на русский");in.setBackground(shape(WHITE,15));in.setPadding(d(16),d(17),d(16),d(17));add(body,in,14);
+   TextView feedback=small("");add(body,feedback,14);
+   add(body,button("ПРОВЕРИТЬ ПЕРЕВОД",true,()->{boolean ok=LearningEngine.acceptedAnswer(back,in.getText().toString());feedback.setText(ok?"✓ Верно":"Правильно: "+back);
+     store.record("word_"+cardIndex,ok);if(ok)store.markWord();}),12);
+   add(body,button("СЛЕДУЮЩАЯ КАРТОЧКА",false,()->{cardIndex++;cardRevealed=false;flashcard();}),0);
+ }
+ void dictionary(){header("WÖRTER","Словарь","Слова с родом, множественным числом и переводом.");add(body,button("↺ ПОВТОРЯТЬ КАРТОЧКИ",true,()->flashcard()),18);
  try{java.io.BufferedReader r=new java.io.BufferedReader(new java.io.InputStreamReader(getAssets().open("words.csv")));String row;r.readLine();while((row=r.readLine())!=null){String[] p=row.split(";",-1);if(p.length<7)continue;LinearLayout c=card();add(c,title(p[1]+" "+p[2],22),5);add(c,small(p[3]+" · "+p[4]+" · "+p[0]),9);add(c,text(p[5],17,true),5);add(c,small(p[6]),12);String word=p[1]+" "+p[2];add(c,button("🔊 СЛУШАТЬ",false,()->talk(word,word)),0);add(body,c,12);}}catch(Exception e){} }
  void writing(){
     layout(false);header("SCHREIBEN B1/B2","Письменная практика","Напиши небольшой связный текст. Офлайн проверяется объём и наличие ключевых слов. Смысл, грамматику и стиль оценивай по чек-листу.");
@@ -217,8 +240,8 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
     add(body,button("ВЕРНУТЬСЯ К ПРАКТИКЕ",false,()->draw(3)),0);
  }
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
- String[] n={"Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
- for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
+ String[] n={"Карточки слов","Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
+ for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else if(mode.equals("Карточки слов"))flashcard();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
  }
 
  static class MascotView extends View{
