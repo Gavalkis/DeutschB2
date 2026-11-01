@@ -245,8 +245,8 @@ void enterAnimation(){
   }catch(Exception ignored){}}).start();
  }
  void feedback(boolean ok,String solution){if(answered)return;answered=true;softFeedback(ok);if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
- bottom.removeAllViews();TextView msg=text((ok?"✓ Отлично!":"Правильный ответ:")+" \n"+solution+"\n"+expectedRu,16,true);msg.setTextColor(ok?GREEN:RED);msg.setPadding(d(12),d(10),d(12),d(12));msg.setBackground(shape(ok?LIGHT:0xffffeded,13));add(bottom,msg,10);
- add(bottom,button("ДАЛЕЕ →",true,()->next(ok)),0);
+ bottom.removeAllViews();TextView msg=text((ok?"✓ Отлично!":"Правильный ответ:")+" \n"+solution+"\n"+expectedRu,16,true);msg.setTextColor(ok?GREEN:RED);msg.setPadding(d(12),d(10),d(12),d(12));msg.setBackground(shape(ok?LIGHT:0xffffeded,13));add(bottom,msg,10);msg.setAlpha(0);msg.setTranslationY(d(50));msg.animate().alpha(1).translationY(0).setDuration(320).setInterpolator(new android.view.animation.OvershootInterpolator(.7f)).start();
+ TextView advance=button("ДАЛЕЕ →",true,()->next(ok));add(bottom,advance,0);advance.setAlpha(0);advance.animate().alpha(1).setStartDelay(120).setDuration(240).start();
  }
  void next(boolean ok){if(repairMode&&!ok)repairs.add(repairs.get(qindex));qindex++;showQuestion();}
 
@@ -273,16 +273,22 @@ void enterAnimation(){
     words[at]=replacement;
     return String.join(" ",words);
  }
+
  void addGermanPrompt(String sentence,int spacing){
-   LinearLayout wrap=vertical();TextView hint=smallLight("Нажми на слово, чтобы увидеть его перевод");add(wrap,hint,10);
-   android.widget.TextView line=titleLight(sentence);line.setTextIsSelectable(false);
+   LinearLayout wrap=vertical();
+   add(wrap,smallLight("Нажми на слово: перевод и произношение"),10);
+   TextView line=titleLight(sentence);line.setTextIsSelectable(false);
    android.text.SpannableString span=new android.text.SpannableString(sentence);
    java.util.regex.Matcher match=java.util.regex.Pattern.compile("[\\p{L}ÄÖÜäöüß]+").matcher(sentence);
-   while(match.find()){String w=match.group();span.setSpan(new android.text.style.ClickableSpan(){
-      public void onClick(View v){wordHint(w,v);}
-      public void updateDrawState(android.text.TextPaint p){p.setColor(WHITE);p.setUnderlineText(true);}
-   },match.start(),match.end(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
-   line.setText(span);line.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());line.setHighlightColor(0xff457968);add(wrap,line,0);add(body,wrap,spacing);
+   while(match.find()){
+     String word=match.group();int start=match.start(),end=match.end();
+     span.setSpan(new android.text.style.ClickableSpan(){
+       public void onClick(View view){wordHint(word,(TextView)view,start,end);}
+       public void updateDrawState(android.text.TextPaint paint){paint.setColor(WHITE);paint.setUnderlineText(false);}
+     },start,end,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+   }
+   line.setText(span);line.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());line.setHighlightColor(0xff33534a);
+   add(wrap,line,0);add(body,wrap,spacing);
  }
  String wordTranslation(String w){
    readVocabulary();
@@ -294,15 +300,42 @@ void enterAnimation(){
    for(String entry:entries.split("\\|")){String[] pair=entry.split("=",2);if(pair.length==2)common.put(pair[0],pair[1]);}
    return common.getOrDefault(w,"Значение уточняется в контексте");
  }
- void wordHint(String word,View anchor){
-   String basic=normal(word);HashMap<String,String> m=new HashMap<>();
-   String[] pairs={"der=определённый артикль, муж. род","die=определённый артикль, жен. род/мн. число","das=определённый артикль, ср. род","ein=неопределённый артикль","eine=неопределённый артикль, жен. род","einen=неопределённый артикль, Akkusativ муж. рода","keine=нет, отрицание существительного","ich=я","du=ты","ist=есть, является","sind=являются","habe=имею","hat=имеет","brauche=нуждаюсь","wohnung=квартира (die)","universität=университет (die)","tisch=стол (der)","bahnhof=вокзал (der)","schwer=тяжёлый","alt=старый","groß=большой","wasser=вода (das)","student=студент (der)","auto=автомобиль (das)","lehrer=учитель (der)"};
-   for(String p:pairs){String[] ab=p.split("=",2);m.put(ab[0],ab[1]);}
-   String translation=m.getOrDefault(basic,wordTranslation(basic));
+
+ void wordHint(String word,TextView line,int start,int end){
+   String basic=normal(word);String translation=wordTranslation(basic);
+   if(translation.startsWith("Значение уточняется"))translation=contextualHint(word);
+   talk("hint_"+System.nanoTime(),word);
+   android.text.Layout layout=line.getLayout();if(layout==null)return;
+   int row=layout.getLineForOffset(start);
+   float x=layout.getPrimaryHorizontal(start);
+   float endX=layout.getPrimaryHorizontal(Math.max(start,end-1));
+   int[] position=new int[2];line.getLocationOnScreen(position);
+   int screenWidth=getResources().getDisplayMetrics().widthPixels;
+   int width=Math.min(d(240),screenWidth-d(24));
+   int center=(int)(position[0]+line.getTotalPaddingLeft()+(x+endX)/2);
+   int left=Math.max(d(12),Math.min(screenWidth-width-d(12),center-width/2));
+   int top=position[1]+layout.getLineBottom(row)+d(8);
    android.widget.PopupWindow popup=new android.widget.PopupWindow(this);
-   TextView bubble=text(translation,14,true);bubble.setPadding(d(13),d(10),d(13),d(10));bubble.setBackground(shape(LIGHT,12));
-   popup.setContentView(bubble);popup.setWidth(-2);popup.setHeight(-2);popup.setOutsideTouchable(true);popup.setBackgroundDrawable(shape(LIGHT,12));popup.setElevation(d(7));popup.showAsDropDown(anchor,Math.min(d(15),anchor.getWidth()/5),d(4));
-   bubble.setOnClickListener(v->popup.dismiss());new Handler().postDelayed(()->{if(popup.isShowing())popup.dismiss();},3200);
+   LinearLayout content=vertical();content.setPadding(d(12),d(10),d(12),d(10));content.setBackground(shape(LIGHT,14));
+   TextView value=text(word+"  🔊",13,true);value.setTextColor(GREEN);add(content,value,2);
+   TextView meaning=text(translation,14,true);meaning.setTextColor(NAVY);add(content,meaning,0);
+   popup.setContentView(content);popup.setWidth(width);popup.setHeight(-2);popup.setOutsideTouchable(true);
+   popup.setBackgroundDrawable(shape(LIGHT,14));popup.setElevation(d(8));content.setAlpha(0);content.setScaleX(.94f);content.setScaleY(.94f);
+   popup.showAtLocation(root,Gravity.TOP|Gravity.LEFT,left,top);
+   content.animate().alpha(1).scaleX(1).scaleY(1).setDuration(180).start();
+   content.setOnClickListener(v->{talk("hint_"+System.nanoTime(),word);});
+   new Handler(android.os.Looper.getMainLooper()).postDelayed(()->{if(popup.isShowing())popup.dismiss();},3800);
+ }
+ String contextualHint(String word){
+   String basic=normal(word);String de=expected,ru=expectedRu;
+   if(basic.equals("erklärt"))return "объясняет";
+   if(basic.equals("lehrerin"))return "учительница";
+   if(basic.equals("bücher"))return "книги (das Buch)";
+   if(basic.equals("interessant"))return "интересный";
+   if(basic.equals("das")||basic.equals("die")||basic.equals("der"))return "определённый артикль, форма зависит от рода и падежа";
+   if(basic.equals("wörter"))return "слова (das Wort)";
+   if(basic.equals("man"))return "люди, кто-то (неопределённое лицо)";
+   return "Контекст: "+ru;
  }
  void results(){if(!repairMode&&!wrong.isEmpty()){repairMode=true;repairs.addAll(wrong);qindex=0;showRepairIntro();return;}if(repairMode){for(int i=0;i<repairs.size();i++){} }layout(true);TextView trophy=text(score>=8?"★ Отличная работа!":"Урок завершён",28,true);trophy.setTextColor(GOLD);add(body,trophy,28);
  TextView points=text(score+" / "+questionOrder.size()+" правильных",25,true);points.setTextColor(WHITE);add(body,points,14);
