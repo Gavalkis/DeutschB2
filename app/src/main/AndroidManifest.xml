@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
-    <application android:theme="@style/AppTheme" android:label="Deutsch bis B2" android:allowBackup="true" android:usesCleartextTraffic="false">
+    <application android:theme="@style/AppTheme" android:label="Mein Deutsch" android:icon="@mipmap/ic_launcher" android:allowBackup="true" android:usesCleartextTraffic="false">
         <activity android:name=".CameraActivity" android:screenOrientation="portrait" android:exported="false" />
         <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="false" />
         <activity android:name=".CourseActivity" android:screenOrientation="portrait" android:exported="true">
