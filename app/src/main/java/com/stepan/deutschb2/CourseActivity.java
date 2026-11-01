@@ -418,18 +418,40 @@ void enterAnimation(){
  }
 
  static class MascotView extends View{
-   final android.graphics.Paint p=new android.graphics.Paint(3);int mood;public MascotView(Context c,int m){super(c);mood=m;}
-   void oval(android.graphics.Canvas c,int col,float a,float b,float x,float y){p.setColor(col);p.setStyle(android.graphics.Paint.Style.FILL);c.drawOval(a,b,x,y,p);}
-   protected void onDraw(android.graphics.Canvas cv){super.onDraw(cv);cv.save();cv.scale(getWidth()/140f,getHeight()/170f);
-     int orange=0xffffaa46,dk=0xff273b32,cream=0xffffe4b9;
-     oval(cv,orange,15,35,125,150);oval(cv,orange,13,13,45,57);oval(cv,orange,92,13,126,57);
-     oval(cv,0xfff9dba5,24,52,116,133);oval(cv,cream,45,92,95,135);
-     oval(cv,dk,39,67,51,83);oval(cv,dk,88,67,100,83);oval(cv,dk,64,98,77,108);
-     p.setColor(dk);p.setStrokeWidth(5);p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-     cv.drawLine(52,35,59,55,p);cv.drawLine(82,35,77,55,p);
-     cv.drawLine(19,84,35,88,p);cv.drawLine(104,88,121,84,p);
-     if(mood==1){p.setStyle(android.graphics.Paint.Style.STROKE);cv.drawArc(51,102,88,120,0,180,false,p);p.setStyle(android.graphics.Paint.Style.FILL);}
-     else{p.setStrokeWidth(3);cv.drawLine(64,116,79,116,p);}
+   final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+   final int ORANGE=0xffff922c, BLACK=0xff162b27, CREAM=0xfffff1d5, PINK=0xfff47175;
+   int mood;public MascotView(Context c,int m){super(c);mood=m;}
+   void oval(Canvas c,int color,float l,float t,float r,float b){paint.setStyle(Paint.Style.FILL);paint.setColor(color);c.drawOval(l,t,r,b,paint);}
+   void path(Canvas c,int color,float... coords){
+     Path path=new Path();path.moveTo(coords[0],coords[1]);for(int i=2;i<coords.length;i+=2)path.lineTo(coords[i],coords[i+1]);
+     path.close();paint.setStyle(Paint.Style.FILL);paint.setColor(color);c.drawPath(path,paint);
+   }
+   void smile(Canvas c){paint.setColor(BLACK);paint.setStrokeWidth(4);paint.setStyle(Paint.Style.STROKE);paint.setStrokeCap(Paint.Cap.ROUND);
+     c.drawArc(49,92,92,125,5,165,false,paint);paint.setStyle(Paint.Style.FILL);}
+   protected void onDraw(Canvas cv){
+     super.onDraw(cv);cv.save();cv.scale(getWidth()/140f,getHeight()/170f);
+     oval(cv,0xffe3ad67,17,144,126,159);
+     oval(cv,BLACK,10,19,48,63);oval(cv,BLACK,89,19,130,63);
+     oval(cv,CREAM,17,27,45,56);oval(cv,CREAM,95,27,123,56);
+     oval(cv,BLACK,15,33,127,142);
+     oval(cv,ORANGE,20,35,122,139);
+     oval(cv,CREAM,24,79,58,120);oval(cv,CREAM,83,79,118,120);
+     oval(cv,CREAM,49,100,93,136);
+     path(cv,BLACK,26,64,43,72,43,79,27,75);
+     path(cv,BLACK,116,64,101,72,100,79,116,75);
+     path(cv,BLACK,42,41,57,49,62,60,47,58);
+     path(cv,BLACK,99,41,83,49,79,60,94,58);
+     path(cv,BLACK,65,37,75,37,79,59,70,50,61,58);
+     oval(cv,WHITE,37,67,66,102);oval(cv,WHITE,75,67,106,102);
+     oval(cv,BLACK,49,73,64,96);oval(cv,BLACK,79,73,94,96);
+     oval(cv,WHITE,51,75,56,82);oval(cv,WHITE,81,75,86,82);
+     oval(cv,PINK,57,95,83,113);
+     path(cv,BLACK,58,98,82,98,71,109);
+     smile(cv);
+     oval(cv,BLACK,14,126,56,159);oval(cv,BLACK,85,126,128,159);
+     oval(cv,ORANGE,19,126,53,154);oval(cv,ORANGE,89,126,124,154);
+     path(cv,BLACK,31,132,38,137,37,145,28,141);
+     path(cv,BLACK,111,132,104,137,105,145,114,141);
      cv.restore();
    }
  }
