@@ -62,7 +62,7 @@ public class MainActivity extends ComponentActivity implements TextToSpeech.OnIn
         prefs=getSharedPreferences("progress_v2",0);
         tts=new TextToSpeech(this,this);
         loadData();
-        showShell(0);
+        showShell(getIntent().getBooleanExtra("camera",false)?4:0);
     }
 
     void loadData(){
