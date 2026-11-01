@@ -106,7 +106,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  if(stage==1){add(c,title("Формы и окончания",22),14);
  JSONArray tab=g.getJSONArray("table");for(int j=0;j<tab.length();j++){JSONArray row=tab.getJSONArray(j);LinearLayout rr=horizontal();rr.setBackground(shape(j%2==0?LIGHT:BG,7));for(int k=0;k<row.length();k++){TextView cell=text(row.getString(k),row.length()>3?12:14,j==0);cell.setPadding(d(5),d(12),d(3),d(12));rr.addView(cell,new LinearLayout.LayoutParams(0,-2,1));}add(c,rr,3);}
  add(c,small(g.getString("tip")),3);}
- if(stage==2){add(c,title("Как это звучит",22),12);JSONArray ex=l.getJSONArray("examples");for(int j=0;j<ex.length();j++){String[] pair=ex.getString(j).split("\\|",2);final int k=j;LinearLayout line=vertical();line.setBackground(shape(BG,12));pad(line,12);
+ if(stage==2){add(c,title("Примеры с переводом",22),12);JSONArray ex=l.getJSONArray("examples");JSONArray extra=bank.getJSONObject(unit).getJSONArray("items");int shown=Math.max(5,ex.length());for(int j=0;j<shown;j++){String[] pair;if(j<ex.length())pair=ex.getString(j).split("\\|",2);else {JSONObject item=extra.getJSONObject((j-ex.length())%extra.length());pair=new String[]{item.getString("de"),item.getString("ru")};}final int k=j;LinearLayout line=vertical();line.setBackground(shape(BG,12));pad(line,12);
  add(line,title(pair[0],18),6);add(line,small(pair.length>1?pair[1]:""),12);add(line,button("🔊  СЛУШАТЬ",false,()->talk("ex"+unit+"-"+k,pair[0])),0);add(c,line,11);}
  }
  add(body,c,20);
@@ -128,7 +128,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  ArrayList<String> variants=new ArrayList<>();variants.add(ru);JSONArray all=bank.getJSONObject(unit).getJSONArray("items");for(int j=0;j<all.length()&&variants.size()<4;j++){String candidate=all.getJSONObject((j+qindex+3)%all.length()).getString("ru");if(!variants.contains(candidate))variants.add(candidate);}Collections.shuffle(variants);choiceList(variants,ru);}
  else if(type==1||type==4){String[] words=de.replaceAll("[!?.,]","").split(" ");int pos=0;for(int j=0;j<words.length;j++)if(words[j].equalsIgnoreCase(focus)){pos=j;break;}String target=words[pos];String prompt=de.replaceFirst("(?i)\\b"+java.util.regex.Pattern.quote(target)+"\\b","____");
  addGermanPrompt(prompt,8);add(body,smallLight("Нажми на немецкое слово для подсказки. Перевод фразы появится после ответа."),24);
- ArrayList<String> opts=new ArrayList<>(Arrays.asList(LearningEngine.topicForms(unit,target)));Collections.shuffle(opts);choiceList(opts,target);}
+ ArrayList<String> opts=new ArrayList<>(Arrays.asList(LearningEngine.topicForms(unit,target)));if(unit==23&&focus.equals("Ø"))opts=new ArrayList<>(Arrays.asList("Ø","ein","eine","kein"));Collections.shuffle(opts);choiceList(opts,target);}
  else if(type==2){TextView line=text(ru,18,true);line.setTextColor(WHITE);add(body,line,16);wordBank(de);}
  else if(type==3){dialogueQuestion();}
  else if(type==5){TextView line=text(ru,18,true);line.setTextColor(WHITE);add(body,line,16);inputQuestion("Переведи на немецкий",de);}
@@ -238,7 +238,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
    EditText in=new EditText(this);in.setSingleLine(true);in.setHint(cardRuToDe?"Артикль + слово по-немецки":"Перевод на русский");in.setBackground(shape(WHITE,15));in.setPadding(d(16),d(17),d(16),d(17));add(body,in,14);
    TextView feedback=small("");add(body,feedback,14);
    add(body,button("ПРОВЕРИТЬ ПЕРЕВОД",true,()->{boolean ok=LearningEngine.acceptedAnswer(back,in.getText().toString());feedback.setText(ok?"✓ Верно":"Правильно: "+back);
-     store.record("word_"+cardIndex,ok);if(ok)store.markWord();}),12);
+     store.record("word_"+cardIndex,ok);if(ok&&store.errors("word_"+cardIndex)==0)store.markWord();}),12);
    add(body,button("СЛЕДУЮЩАЯ КАРТОЧКА",false,()->{cardIndex++;cardRevealed=false;flashcard();}),0);
  }
  void dictionary(){header("WÖRTER","Словарь","Слова с родом, множественным числом и переводом.");add(body,button("↺ ПОВТОРЯТЬ КАРТОЧКИ",true,()->flashcard()),18);
