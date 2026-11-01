@@ -59,7 +59,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
   ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);progress.setProgress(percent);add(details,progress,8);
   TextView st=text("🔥 "+store.streak()+" дней подряд",15,true);st.setTextColor(WHITE);add(details,st,0);
   heroRow.addView(details,new LinearLayout.LayoutParams(0,-2,1));
-  MascotView tiger=new MascotView(this,store.streak()>1?1:0);heroRow.addView(tiger,new LinearLayout.LayoutParams(d(100),d(132)));
+  MascotView tiger=new MascotView(this,store.streak()>1?1:0);heroRow.addView(tiger,new LinearLayout.LayoutParams(d(100),d(132)));tiger.animate().translationY(-d(6)).setDuration(1100).setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).withEndAction(()->tiger.animate().translationY(0).setDuration(1100).start()).start();
   add(hero,heroRow,17);add(hero,button("ПРОДОЛЖИТЬ УРОК",false,()->openLesson(Math.min(finished,total-1))),0);add(body,hero,18);
 
   LinearLayout today=card();add(today,title("Сегодня",22),12);
@@ -166,7 +166,21 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  add(body,grid,10);buttonArea(de);}
  void inputQuestion(String hint,String correct){EditText field=new EditText(this);field.setTextColor(WHITE);field.setHintTextColor(0xffa7b9b3);field.setHint(hint);field.setTextSize(18);field.setMinLines(2);field.setBackground(shape(0xff263e39,16));field.setPadding(d(18),d(15),d(18),d(15));add(body,field,20);
  bottom.removeAllViews();add(bottom,button("ДАЛЕЕ →",true,()->{chosen=field.getText().toString();feedback(normal(chosen).equals(normal(correct)),correct);}),0);}
- void feedback(boolean ok,String solution){if(answered)return;answered=true;feedbackTone.startTone(ok?android.media.ToneGenerator.TONE_PROP_ACK:android.media.ToneGenerator.TONE_PROP_NACK,95);if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
+
+ void softFeedback(boolean ok){
+  new Thread(()->{try{
+    int rate=22050;int ms=ok?190:145;int n=rate*ms/1000;byte[] pcm=new byte[n*2];
+    for(int i=0;i<n;i++){
+      double t=(double)i/rate;double fade=Math.sin(Math.PI*(double)i/n);fade=fade*fade;
+      double hz=ok?(i<n/2?523.25:659.25):220.0;
+      double wave=Math.sin(2*Math.PI*hz*t)*(ok?.18:.09)*fade;
+      short sample=(short)(wave*32767);pcm[2*i]=(byte)(sample&255);pcm[2*i+1]=(byte)((sample>>8)&255);
+    }
+    android.media.AudioTrack tr=new android.media.AudioTrack(android.media.AudioManager.STREAM_MUSIC,rate,android.media.AudioFormat.CHANNEL_OUT_MONO,android.media.AudioFormat.ENCODING_PCM_16BIT,pcm.length,android.media.AudioTrack.MODE_STATIC);
+    tr.write(pcm,0,pcm.length);tr.play();Thread.sleep(ms+30);tr.release();
+  }catch(Exception ignored){}}).start();
+ }
+ void feedback(boolean ok,String solution){if(answered)return;answered=true;softFeedback(ok);if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
  bottom.removeAllViews();TextView msg=text((ok?"✓ Отлично!":"Правильный ответ:")+" \n"+solution+"\n"+expectedRu,16,true);msg.setTextColor(ok?GREEN:RED);msg.setPadding(d(12),d(10),d(12),d(12));msg.setBackground(shape(ok?LIGHT:0xffffeded,13));add(bottom,msg,10);
  add(bottom,button("ДАЛЕЕ →",true,()->next(ok)),0);
  }
@@ -278,8 +292,8 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
    }catch(Exception ex){Toast.makeText(this,"Не удалось воспроизвести: "+ex.getMessage(),1).show();}
  }
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
- String[] n={"Импорт своего MP3","Карточки слов","Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
- for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else if(mode.equals("Импорт своего MP3"))importAudio();else if(mode.equals("Карточки слов"))flashcard();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
+ String[] n={"Слушать свой MP3","Импорт своего MP3","Карточки слов","Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
+ for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else if(mode.equals("Слушать свой MP3"))playImported();else if(mode.equals("Импорт своего MP3"))importAudio();else if(mode.equals("Карточки слов"))flashcard();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
  }
 
  static class MascotView extends View{
