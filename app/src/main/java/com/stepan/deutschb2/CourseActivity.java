@@ -15,7 +15,7 @@ import java.util.*;
 public class CourseActivity extends Activity implements TextToSpeech.OnInitListener {
  final int BG=0xfff6f7f2, NAVY=0xff142b28, GREEN=0xff256c55, LIGHT=0xffe6efe7, MUTED=0xff647873, WHITE=0xffffffff, RED=0xffb93a4a, GOLD=0xffffc84d;
  LinearLayout root,body,bottom; ScrollView scroll; TextToSpeech tts; boolean voiceReady=false; String speaking=""; android.media.ToneGenerator feedbackTone=new android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC,32);
- JSONArray guides,lessons,bank; android.content.SharedPreferences prefs;
+ JSONArray guides,lessons,bank,dialogues; android.content.SharedPreferences prefs;
  int page=0,unit=0,stage=0,qindex=0,score=0; boolean exam=false,answered=false,repairMode=false,fromSpeech=false; String chosen="",expected="",expectedRu="";
  LearningEngine.Store store; ArrayList<Integer> wrong=new ArrayList<>(); ArrayList<Integer> repairs=new ArrayList<>(); long sessionStarted; int lastSpeechIndex=-1;
  ArrayList<Integer> questionOrder=new ArrayList<>(); final Random random=new Random(19);
@@ -23,7 +23,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  String[] tabs={"Дом","Уроки","Слова","Практика","Камера"};
  public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
  prefs=getSharedPreferences("course_v4",MODE_PRIVATE);store=new LearningEngine.Store(this);store.touchToday();sessionStarted=System.currentTimeMillis();tts=new TextToSpeech(this,this);
- try{guides=new JSONArray(asset("lesson_guides.json"));lessons=new JSONArray(asset("lessons.json"));bank=new JSONArray(asset("practice_bank.json"));}catch(Exception ex){Toast.makeText(this,ex.toString(),1).show();}
+ try{guides=new JSONArray(asset("lesson_guides.json"));lessons=new JSONArray(asset("lessons.json"));bank=new JSONArray(asset("practice_bank.json"));dialogues=new JSONArray(asset("listening_dialogues.json"));}catch(Exception ex){Toast.makeText(this,ex.toString(),1).show();}
  draw(0);}
  String asset(String name)throws Exception{java.io.InputStream in=getAssets().open(name);java.io.ByteArrayOutputStream o=new java.io.ByteArrayOutputStream();byte[] b=new byte[8192];int n;while((n=in.read(b))>0)o.write(b,0,n);return o.toString("UTF-8");}
  int d(float x){return (int)(x*getResources().getDisplayMetrics().density);}
@@ -130,7 +130,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  addGermanPrompt(prompt,8);add(body,smallLight("Нажми на немецкое слово для подсказки. Перевод фразы появится после ответа."),24);
  ArrayList<String> opts=new ArrayList<>(Arrays.asList(LearningEngine.topicForms(unit,target)));Collections.shuffle(opts);choiceList(opts,target);}
  else if(type==2){TextView line=text(ru,18,true);line.setTextColor(WHITE);add(body,line,16);wordBank(de);}
- else if(type==3){add(body,button("🔊  ПРОСЛУШАТЬ",false,()->talk("listen"+qindex,de)),22);inputQuestion("Напиши услышанное предложение",de);}
+ else if(type==3){dialogueQuestion();}
  else if(type==5){TextView line=text(ru,18,true);line.setTextColor(WHITE);add(body,line,16);inputQuestion("Переведи на немецкий",de);}
  else if(type==6){addGermanPrompt(de,16);add(body,button("🔊  СЛУШАТЬ",false,()->talk("say"+qindex,de)),14);add(body,button("🎙  ПРОИЗНЕСТИ",false,()->recognize(de)),12);
  add(body,smallLight("После распознавания приложение сравнит текст с эталоном. Порог: 70%."),0);}
@@ -139,6 +139,24 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  TextView titleLight(String s){TextView t=title(s,22);t.setTextColor(WHITE);return t;}
  TextView smallLight(String s){TextView t=small(s);t.setTextColor(0xffb7ccc5);return t;}
+
+ void dialogueQuestion(){
+  try{
+    ArrayList<JSONObject> matching=new ArrayList<>();
+    String target=level(unit);
+    for(int i=0;i<dialogues.length();i++){JSONObject d=dialogues.getJSONObject(i);if(d.getString("level").equals(target))matching.add(d);}
+    if(matching.isEmpty()){inputQuestion("Напиши услышанное",expected);return;}
+    JSONObject dialogue=matching.get((qindex/3)%matching.size());
+    String audio=dialogue.getString("de"),statement=dialogue.getString("statement"),correct=dialogue.getString("answer");
+    expectedRu=dialogue.getString("explanation");
+    expected=audio;
+    add(body,button("🔊 СЛУШАТЬ ДИАЛОГ",false,()->talk("dialogue_"+qindex,audio)),20);
+    add(body,smallLight("Прослушай дважды. Оцени утверждение."),13);
+    TextView question=titleLight(statement);add(body,question,20);
+    ArrayList<String> variants=new ArrayList<>(Arrays.asList("Richtig","Falsch"));
+    choiceList(variants,correct);
+  }catch(Exception e){Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();}
+ }
  void choiceList(ArrayList<String> options,String answer){LinearLayout list=vertical();for(String x:options){TextView b=text(x,17,false);b.setPadding(d(18),d(20),d(14),d(20));b.setBackground(shape(0xff263e39,16));b.setTextColor(WHITE);add(list,b,10);b.setOnClickListener(v->{chosen=x;for(int j=0;j<list.getChildCount();j++){View z=list.getChildAt(j);z.setBackground(shape(z==b?GREEN:0xff263e39,16));}buttonArea(answer);});}add(body,list,20);buttonArea(answer);}
  void buttonArea(String answer){bottom.removeAllViews();add(bottom,button("ПРОВЕРИТЬ",true,()->feedback(normal(chosen).equals(normal(answer)),answer)),0);}
  void wordBank(String de){ArrayList<String> parts=new ArrayList<>(Arrays.asList(de.replaceAll("[.!?]","").split(" ")));Collections.shuffle(parts);
