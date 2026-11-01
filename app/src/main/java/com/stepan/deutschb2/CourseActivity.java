@@ -255,19 +255,34 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
    String line;r.readLine();while((line=r.readLine())!=null){String[] p=line.split(";",-1);if(p.length>=7)vocabulary.add(p);}
   }catch(Exception ignored){}
  }
- void flashcard(){readVocabulary();if(vocabulary.isEmpty()){draw(2);return;}layout(false);
-   header("KARTEIKARTEN","Вспоминай активно","Переверни карточку, затем обязательно введи перевод.");
-   String[] w=vocabulary.get(cardIndex%vocabulary.size());cardRuToDe=(cardIndex%2==1);String front=cardRuToDe?w[4]:w[1]+" "+w[2],back=cardRuToDe?(w[1]+" "+w[2]):w[4];
-   LinearLayout c=card();c.setMinimumHeight(d(230));c.setGravity(Gravity.CENTER);
-   TextView face=title(front,28);face.setGravity(Gravity.CENTER);add(c,face,15);
-   TextView clue=small("Нажми, чтобы перевернуть");clue.setGravity(Gravity.CENTER);add(c,clue,0);
-   c.setOnClickListener(v->{cardRevealed=!cardRevealed;face.setText(cardRevealed?back:front);});
-   add(body,c,20);
-   EditText in=new EditText(this);in.setSingleLine(true);in.setHint(cardRuToDe?"Артикль + слово по-немецки":"Перевод на русский");in.setBackground(shape(WHITE,15));in.setPadding(d(16),d(17),d(16),d(17));add(body,in,14);
-   TextView feedback=small("");add(body,feedback,14);
-   add(body,button("ПРОВЕРИТЬ ПЕРЕВОД",true,()->{boolean ok=LearningEngine.acceptedAnswer(back,in.getText().toString());feedback.setText(ok?"✓ Верно":"Правильно: "+back);
-     store.record("word_"+cardIndex,ok);if(ok&&store.errors("word_"+cardIndex)==0)store.markWord();}),12);
-   add(body,button("СЛЕДУЮЩАЯ КАРТОЧКА",false,()->{cardIndex++;cardRevealed=false;flashcard();}),0);
+
+ ArrayList<Integer> weakCards=new ArrayList<>();
+ void flashcard(){
+   readVocabulary();if(vocabulary.isEmpty()){draw(2);return;}
+   layout(false);header("KARTEIKARTEN","Вспоминай активно","Ответь самостоятельно. Сложные слова вернутся в следующих карточках.");
+   final int index=(cardIndex>0&&cardIndex%4==0&&!weakCards.isEmpty())?weakCards.remove(0):cardIndex%vocabulary.size();
+   String[] w=vocabulary.get(index);cardRuToDe=(cardIndex%2==1);
+   String front=cardRuToDe?w[4]:w[1]+" "+w[2],back=cardRuToDe?(w[1]+" "+w[2]):w[4];
+   LinearLayout c=card();c.setMinimumHeight(d(205));c.setGravity(Gravity.CENTER);
+   TextView face=title(front,29);face.setGravity(Gravity.CENTER);add(c,face,12);
+   TextView clue=small("Нажми для подсказки на обратной стороне");clue.setGravity(Gravity.CENTER);add(c,clue,0);
+   c.setOnClickListener(v->{cardRevealed=!cardRevealed;face.setText(cardRevealed?back:front);});add(body,c,20);
+   EditText in=new EditText(this);in.setSingleLine(true);in.setHint(cardRuToDe?"Артикль + существительное":"Русский перевод");in.setBackground(shape(WHITE,15));
+   in.setPadding(d(16),d(16),d(16),d(16));add(body,in,13);
+   TextView feedback=small("");add(body,feedback,11);
+   add(bottom,button("ДАЛЕЕ →",true,()->{
+      if(in.getTag()!=null)return;
+      in.setTag("checked");
+      boolean ok=LearningEngine.acceptedAnswer(back,in.getText().toString());
+      store.record("word_"+index,ok);
+      if(ok&&!prefs.getBoolean("known_"+index,false)){prefs.edit().putBoolean("known_"+index,true).apply();store.markWord();}
+      if(!ok)weakCards.add(index);
+      feedback.setText(ok?"✓ Правильно! "+back:"Нужно запомнить: "+back);
+      face.setText(back);
+      in.setEnabled(false);
+      final LinearLayout liveRoot=root;
+      new Handler(android.os.Looper.getMainLooper()).postDelayed(()->{if(root==liveRoot){cardIndex++;cardRevealed=false;flashcard();}},ok?1000:1900);
+   }),0);
  }
  void dictionary(){header("WÖRTER","Словарь","Слова с родом, множественным числом и переводом.");add(body,button("↺ ПОВТОРЯТЬ КАРТОЧКИ",true,()->flashcard()),18);
  try{java.io.BufferedReader r=new java.io.BufferedReader(new java.io.InputStreamReader(getAssets().open("words.csv")));String row;r.readLine();while((row=r.readLine())!=null){String[] p=row.split(";",-1);if(p.length<7)continue;LinearLayout c=card();add(c,title(p[1]+" "+p[2],22),5);add(c,small(p[3]+" · "+p[4]+" · "+p[0]),9);add(c,text(p[5],17,true),5);add(c,small(p[6]),12);String word=p[1]+" "+p[2];add(c,button("🔊 СЛУШАТЬ",false,()->talk(word,word)),0);add(body,c,12);}}catch(Exception e){} }
