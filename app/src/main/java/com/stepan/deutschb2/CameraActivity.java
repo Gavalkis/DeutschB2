@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.graphics.*;
+import android.graphics.drawable.GradientDrawable;
+import androidx.activity.ComponentActivity;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.Network;
@@ -22,7 +24,7 @@ import java.io.*;
 import java.net.*;
 import org.json.*;
 
-public class CameraActivity extends Activity implements TextToSpeech.OnInitListener {
+public class CameraActivity extends ComponentActivity implements TextToSpeech.OnInitListener {
   private LinearLayout screen,overlays;
   private PreviewView preview;
   private TextView label,status;
