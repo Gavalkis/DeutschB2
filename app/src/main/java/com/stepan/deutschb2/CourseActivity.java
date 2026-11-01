@@ -215,20 +215,29 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
    android.text.SpannableString span=new android.text.SpannableString(sentence);
    java.util.regex.Matcher match=java.util.regex.Pattern.compile("[\\p{L}ÄÖÜäöüß]+").matcher(sentence);
    while(match.find()){String w=match.group();span.setSpan(new android.text.style.ClickableSpan(){
-      public void onClick(View v){wordHint(w);}
+      public void onClick(View v){wordHint(w,v);}
       public void updateDrawState(android.text.TextPaint p){p.setColor(WHITE);p.setUnderlineText(true);}
    },match.start(),match.end(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
    line.setText(span);line.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());line.setHighlightColor(0xff457968);add(wrap,line,0);add(body,wrap,spacing);
  }
- String wordTranslation(String w){try{for(int i=0;i<bank.length();i++){JSONArray items=bank.getJSONObject(i).getJSONArray("items");for(int j=0;j<items.length();j++){JSONObject x=items.getJSONObject(j);String de=x.getString("de"),ru=x.getString("ru");if(de.toLowerCase(Locale.GERMAN).contains(w))return ru;}}}catch(Exception ignored){}return "Перевод слова уточняется в контексте";}
- void wordHint(String word){
+ String wordTranslation(String w){
+   readVocabulary();
+   for(String[] p:vocabulary){if(p.length<5)continue;
+     if(p[2].equalsIgnoreCase(w)||p[3].equalsIgnoreCase(w))return p[4]+" ("+p[1]+" "+p[2]+")";
+   }
+   HashMap<String,String> common=new HashMap<>();
+   String entries="ist=есть, является|sind=есть, являются|interessant=интересный|schwer=тяжёлый|groß=большой|klein=маленький|gut=хороший|alt=старый|neu=новый|mein=мой|meine=моя|dein=твой|deine=твоя|du=ты|ich=я|wir=мы|ihr=вы|er=он|sie=она, они|es=оно|lernen=учить|lerne=учу|lernst=учишь|gelernt=выучил|kommen=приходить|kommt=приходит|gekommen=пришёл|gehe=иду|geht=идёт|gehen=идти|ging=шёл|wird=станет, будет|werden=становиться, будут|habe=имею|hast=имеешь|hat=имеет|hatte=имел|nicht=не|kein=нет, никакой|keine=нет, никакая|einen=артикль Akkusativ мужского рода|einer=артикль Dativ женского рода|mit=с, на|für=для|auf=на, по|in=в|zu=к, в|bei=у, при|nach=в, после|aus=из|im=в (in dem)|am=в, на (an dem)|um=в (время)|von=от|weil=потому что|dass=что|wenn=если, когда|obwohl=хотя|deshalb=поэтому|trotzdem=несмотря на это|morgen=завтра|heute=сегодня|gestern=вчера|früh=рано|spät=поздно|immer=всегда|oft=часто|viel=много|sehr=очень|auch=тоже|schon=уже|noch=ещё|ich=я|weiß=знаю|möchte=хотел бы|muss=должен|kann=могу|will=хочу|besonders=особенно|wichtig=важный|möglich=возможный|besser=лучше|größer=больше|schneller=быстрее|schöne=красивый|schön=красивый|brauche=мне нужно|brauchen=нуждаться|warten=ждать|sprechen=говорить|spreche=говорю|spricht=говорит|verstanden=понял|wurde=был (пассив)|würde=бы (сослагательное)|hätte=имел бы|wäre=был бы|bin=есть (я)|bist=есть (ты)|war=был";
+   for(String entry:entries.split("\\|")){String[] pair=entry.split("=",2);if(pair.length==2)common.put(pair[0],pair[1]);}
+   return common.getOrDefault(w,"Значение уточняется в контексте");
+ }
+ void wordHint(String word,View anchor){
    String basic=normal(word);HashMap<String,String> m=new HashMap<>();
    String[] pairs={"der=определённый артикль, муж. род","die=определённый артикль, жен. род/мн. число","das=определённый артикль, ср. род","ein=неопределённый артикль","eine=неопределённый артикль, жен. род","einen=неопределённый артикль, Akkusativ муж. рода","keine=нет, отрицание существительного","ich=я","du=ты","ist=есть, является","sind=являются","habe=имею","hat=имеет","brauche=нуждаюсь","wohnung=квартира (die)","universität=университет (die)","tisch=стол (der)","bahnhof=вокзал (der)","schwer=тяжёлый","alt=старый","groß=большой","wasser=вода (das)","student=студент (der)","auto=автомобиль (das)","lehrer=учитель (der)"};
    for(String p:pairs){String[] ab=p.split("=",2);m.put(ab[0],ab[1]);}
    String translation=m.getOrDefault(basic,wordTranslation(basic));
    android.widget.PopupWindow popup=new android.widget.PopupWindow(this);
    TextView bubble=text(translation,14,true);bubble.setPadding(d(13),d(10),d(13),d(10));bubble.setBackground(shape(LIGHT,12));
-   popup.setContentView(bubble);popup.setWidth(-2);popup.setHeight(-2);popup.setOutsideTouchable(true);popup.setBackgroundDrawable(shape(LIGHT,12));popup.setElevation(d(7));popup.showAtLocation(root,Gravity.TOP|Gravity.CENTER_HORIZONTAL,0,d(190));
+   popup.setContentView(bubble);popup.setWidth(-2);popup.setHeight(-2);popup.setOutsideTouchable(true);popup.setBackgroundDrawable(shape(LIGHT,12));popup.setElevation(d(7));popup.showAsDropDown(anchor,Math.min(d(15),anchor.getWidth()/5),d(4));
    bubble.setOnClickListener(v->popup.dismiss());new Handler().postDelayed(()->{if(popup.isShowing())popup.dismiss();},3200);
  }
  void results(){if(!repairMode&&!wrong.isEmpty()){repairMode=true;repairs.addAll(wrong);qindex=0;showRepairIntro();return;}if(repairMode){for(int i=0;i<repairs.size();i++){} }layout(true);TextView trophy=text(score>=8?"★ Отличная работа!":"Урок завершён",28,true);trophy.setTextColor(GOLD);add(body,trophy,28);
