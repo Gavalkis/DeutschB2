@@ -442,9 +442,9 @@ void enterAnimation(){
      path(cv,BLACK,42,41,57,49,62,60,47,58);
      path(cv,BLACK,99,41,83,49,79,60,94,58);
      path(cv,BLACK,65,37,75,37,79,59,70,50,61,58);
-     oval(cv,WHITE,37,67,66,102);oval(cv,WHITE,75,67,106,102);
+     oval(cv,0xffffffff,37,67,66,102);oval(cv,0xffffffff,75,67,106,102);
      oval(cv,BLACK,49,73,64,96);oval(cv,BLACK,79,73,94,96);
-     oval(cv,WHITE,51,75,56,82);oval(cv,WHITE,81,75,86,82);
+     oval(cv,0xffffffff,51,75,56,82);oval(cv,0xffffffff,81,75,86,82);
      oval(cv,PINK,57,95,83,113);
      path(cv,BLACK,58,98,82,98,71,109);
      smile(cv);
