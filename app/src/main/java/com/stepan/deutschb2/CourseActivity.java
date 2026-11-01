@@ -262,9 +262,24 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
     }),10);
     add(body,button("ВЕРНУТЬСЯ К ПРАКТИКЕ",false,()->draw(3)),0);
  }
+
+ android.media.MediaPlayer importedPlayer;
+ void importAudio(){
+   Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.setType("audio/*");intent.addCategory(Intent.CATEGORY_OPENABLE);
+   try{startActivityForResult(intent,107);}catch(Exception e){Toast.makeText(this,"Не удалось открыть аудиофайл",1).show();}
+ }
+ void playImported(){
+   try{
+     String uri=prefs.getString("audio_uri","");if(uri.isEmpty()){importAudio();return;}
+     if(importedPlayer!=null){importedPlayer.release();importedPlayer=null;return;}
+     importedPlayer=new android.media.MediaPlayer();
+     importedPlayer.setDataSource(this,android.net.Uri.parse(uri));importedPlayer.prepare();
+     importedPlayer.setOnCompletionListener(player->{player.release();importedPlayer=null;});importedPlayer.start();
+   }catch(Exception ex){Toast.makeText(this,"Не удалось воспроизвести: "+ex.getMessage(),1).show();}
+ }
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
- String[] n={"Карточки слов","Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
- for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else if(mode.equals("Карточки слов"))flashcard();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
+ String[] n={"Импорт своего MP3","Карточки слов","Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
+ for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else if(mode.equals("Импорт своего MP3"))importAudio();else if(mode.equals("Карточки слов"))flashcard();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
  }
 
  static class MascotView extends View{
@@ -287,7 +302,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  void startExam(int end){startPractice(end,true);}
  void recognize(String target){Intent intent=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,"de-DE");intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
  lastSpeechIndex=qindex;try{startActivityForResult(intent,63);}catch(Exception e){new AlertDialog.Builder(this).setMessage("Распознавание речи недоступно без установленной службы Android Speech.").setPositiveButton("OK",null).show();}}
- @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==63&&result==RESULT_OK&&data!=null){ArrayList<String> txt=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);if(txt!=null&&!txt.isEmpty()){String heard=txt.get(0);int pct=(int)Math.round(LearningEngine.similarity(expected,heard)*100);boolean ok=LearningEngine.acceptedSpeech(expected,heard);feedback(ok,expected);new AlertDialog.Builder(this).setTitle("Совпадение: "+pct+"%"+(ok?" ✓":"")).setMessage("Распознано: "+heard+"\nЭталон: "+expected+"\n"+(ok?"Порог 70% пройден.":"Попробуй ещё раз в конце урока.")).setPositiveButton("Понятно",null).show();}}}
+ @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request==107&&result==RESULT_OK&&data!=null){android.net.Uri uri=data.getData();if(uri!=null){try{getContentResolver().takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}prefs.edit().putString("audio_uri",uri.toString()).apply();new AlertDialog.Builder(this).setTitle("Аудиофайл подключён").setMessage("Файл доступен локально для воспроизведения.").setPositiveButton("Слушать",(d,w)->playImported()).setNegativeButton("Позже",null).show();}}if(request==63&&result==RESULT_OK&&data!=null){ArrayList<String> txt=data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);if(txt!=null&&!txt.isEmpty()){String heard=txt.get(0);int pct=(int)Math.round(LearningEngine.similarity(expected,heard)*100);boolean ok=LearningEngine.acceptedSpeech(expected,heard);feedback(ok,expected);new AlertDialog.Builder(this).setTitle("Совпадение: "+pct+"%"+(ok?" ✓":"")).setMessage("Распознано: "+heard+"\nЭталон: "+expected+"\n"+(ok?"Порог 70% пройден.":"Попробуй ещё раз в конце урока.")).setPositiveButton("Понятно",null).show();}}}
  @Override protected void onPause(){stopAudio();super.onPause();}
- @Override protected void onDestroy(){stopAudio();if(tts!=null)tts.shutdown();if(feedbackTone!=null)feedbackTone.release();store.addSession(System.currentTimeMillis()-sessionStarted);super.onDestroy();}
+ @Override protected void onDestroy(){stopAudio();if(tts!=null)tts.shutdown();if(importedPlayer!=null)importedPlayer.release();if(feedbackTone!=null)feedbackTone.release();store.addSession(System.currentTimeMillis()-sessionStarted);super.onDestroy();}
 }
