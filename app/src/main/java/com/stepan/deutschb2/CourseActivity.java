@@ -51,16 +51,16 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
 
  void home(){
   header("MEIN DEUTSCH","Guten Morgen!","Каждый день немного немецкого. Теория, речь и практика.");
-  int finished=Math.min(store.unlocked(),24);int percent=(int)Math.round(100.0*finished/24);
+  int total=lessons.length();int finished=Math.min(store.unlocked(),total);int percent=(int)Math.round(100.0*finished/total);
   LinearLayout hero=card();hero.setBackground(shape(GREEN,24));
   LinearLayout heroRow=horizontal();LinearLayout details=vertical();
   TextView n=text(percent+"% пути до B2",22,true);n.setTextColor(WHITE);add(details,n,6);
-  TextView lvl=text("Текущий уровень: "+level(Math.min(finished,23)),15,false);lvl.setTextColor(0xffdeede5);add(details,lvl,9);
+  TextView lvl=text("Текущий уровень: "+level(Math.min(finished,total-1)),15,false);lvl.setTextColor(0xffdeede5);add(details,lvl,9);
   ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);progress.setProgress(percent);add(details,progress,8);
   TextView st=text("🔥 "+store.streak()+" дней подряд",15,true);st.setTextColor(WHITE);add(details,st,0);
   heroRow.addView(details,new LinearLayout.LayoutParams(0,-2,1));
   MascotView tiger=new MascotView(this,store.streak()>1?1:0);heroRow.addView(tiger,new LinearLayout.LayoutParams(d(100),d(132)));
-  add(hero,heroRow,17);add(hero,button("ПРОДОЛЖИТЬ УРОК",false,()->openLesson(Math.min(finished,23))),0);add(body,hero,18);
+  add(hero,heroRow,17);add(hero,button("ПРОДОЛЖИТЬ УРОК",false,()->openLesson(Math.min(finished,total-1))),0);add(body,hero,18);
 
   LinearLayout today=card();add(today,title("Сегодня",22),12);
   add(today,text("◉ Изучить 1 правило и пройти практику",16,false),10);
@@ -80,7 +80,7 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  void reference(){layout(false);header("NACH­SCHLAGEN","Грамматика A1-B2","Подробные правила и таблицы с примерами и переводами.");
   String[] topics={"Артикли, ein/kein/Ø","Падежи и склонения","Личные местоимения","Притяжательные местоимения","Времена: Präsens, Präteritum, Perfekt","Plusquamperfekt и Futur I","Предлоги и управление","Порядок слов"};
-  int[] selected={23,3,4,5,11,12,14,8};
+  int[] selected={4,5,6,7,15,30,17,10};
   for(int j=0;j<topics.length;j++){final int v=selected[j];LinearLayout c=card();add(c,title(topics[j],18),8);
     if(j==1)add(c,small("Nom: der/die/das • Akk: den/die/das • Dat: dem/der/dem • Gen: des/der/des"),10);
     if(j==4)add(c,small("Präsens - настоящее; Präteritum/Perfekt - прошедшее"),10);
@@ -88,13 +88,13 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
     add(c,button("ПРАВИЛО И ПРИМЕРЫ",true,()->{unit=v;stage=0;showTheory();}),0);add(body,c,12);
   }
  }
- String level(int i){return i<9?"A1":i<18?"A2":i<21?"B1":"B2";}
- void path(){header("КУРС","Маршрут A1 → B2","23 раздела грамматики, теория частями и упражнения после каждой части. Учебный контент постепенно расширяется.");
- for(int i=0;i<24;i++){final int idx=i;try{JSONObject l=lessons.getJSONObject(i);LinearLayout c=card();boolean open=i<=Math.max(done(),23==i?done():0);c.setAlpha(open?1:.48f);
+ String level(int i){try{return lessons.getJSONObject(Math.max(0,Math.min(i,lessons.length()-1))).getString("level");}catch(Exception e){return "A1";}}
+ void path(){header("КУРС","Маршрут A1 → B2",lessons.length()+" разделов грамматики. Теория частями, упражнения, затем повторение.");
+ for(int i=0;i<lessons.length();i++){final int idx=i;try{JSONObject l=lessons.getJSONObject(i);LinearLayout c=card();boolean open=i<=done();c.setAlpha(open?1:.48f);
  TextView lab=small(level(i)+"  ·  УРОК "+(i+1)+(prefs.getBoolean("complete_"+i,false)?"   ✓ ПРОЙДЕН":""));add(c,lab,8);add(c,title(l.getString("title"),19),9);
  add(c,small(open?"Теория → примеры → практика":"Откроется после предыдущего урока"),12);
  if(open)add(c,button(prefs.getBoolean("complete_"+i,false)?"ПОВТОРИТЬ":"НАЧАТЬ",true,()->{c.animate().scaleX(.97f).scaleY(.97f).setDuration(95).withEndAction(()->openLesson(idx)).start();}),0);add(body,c,13);
- if(i==8||i==17||i==20||i==23){final int bound=i;add(body,button("◈ ПРОВЕРКА УРОВНЯ "+level(i),false,()->startExam(bound)),17);}
+ if(i==lessons.length()-1||!level(i).equals(level(i+1))){final int bound=i;add(body,button("◈ ПРОВЕРКА УРОВНЯ "+level(i),false,()->startExam(bound)),17);}
  }catch(Exception ignored){}}
  }
  void openLesson(int i){unit=i;stage=0;showTheory();body.setAlpha(0f);body.animate().alpha(1f).setDuration(230).start();}
@@ -158,17 +158,17 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
   }catch(Exception e){Toast.makeText(this,e.toString(),Toast.LENGTH_SHORT).show();}
  }
  void choiceList(ArrayList<String> options,String answer){LinearLayout list=vertical();for(String x:options){TextView b=text(x,17,false);b.setPadding(d(18),d(20),d(14),d(20));b.setBackground(shape(0xff263e39,16));b.setTextColor(WHITE);add(list,b,10);b.setOnClickListener(v->{chosen=x;for(int j=0;j<list.getChildCount();j++){View z=list.getChildAt(j);z.setBackground(shape(z==b?GREEN:0xff263e39,16));}buttonArea(answer);});}add(body,list,20);buttonArea(answer);}
- void buttonArea(String answer){bottom.removeAllViews();add(bottom,button("ПРОВЕРИТЬ",true,()->feedback(normal(chosen).equals(normal(answer)),answer)),0);}
+ void buttonArea(String answer){bottom.removeAllViews();add(bottom,button("ДАЛЕЕ →",true,()->{if(answered){next(true);}else{feedback(normal(chosen).equals(normal(answer)),answer);}}),0);}
  void wordBank(String de){ArrayList<String> parts=new ArrayList<>(Arrays.asList(de.replaceAll("[.!?]","").split(" ")));Collections.shuffle(parts);
  TextView output=titleLight("...");add(body,output,23);LinearLayout grid=vertical();ArrayList<String> built=new ArrayList<>();
  for(String word:parts){TextView choice=text(word,17,false);choice.setTextColor(WHITE);choice.setPadding(d(15),d(12),d(15),d(12));choice.setBackground(shape(0xff273f39,12));add(grid,choice,7);
  choice.setOnClickListener(v->{built.add(word);choice.setVisibility(View.GONE);chosen=String.join(" ",built);output.setText(chosen);});}
  add(body,grid,10);buttonArea(de);}
  void inputQuestion(String hint,String correct){EditText field=new EditText(this);field.setTextColor(WHITE);field.setHintTextColor(0xffa7b9b3);field.setHint(hint);field.setTextSize(18);field.setMinLines(2);field.setBackground(shape(0xff263e39,16));field.setPadding(d(18),d(15),d(18),d(15));add(body,field,20);
- bottom.removeAllViews();add(bottom,button("ПРОВЕРИТЬ",true,()->{chosen=field.getText().toString();feedback(normal(chosen).equals(normal(correct)),correct);}),0);}
+ bottom.removeAllViews();add(bottom,button("ДАЛЕЕ →",true,()->{chosen=field.getText().toString();feedback(normal(chosen).equals(normal(correct)),correct);}),0);}
  void feedback(boolean ok,String solution){if(answered)return;answered=true;feedbackTone.startTone(ok?android.media.ToneGenerator.TONE_PROP_ACK:android.media.ToneGenerator.TONE_PROP_NACK,95);if(ok)score++;else if(!repairMode)wrong.add(qindex);store.record("topic_"+unit+"_"+(repairMode?repairs.get(qindex):qindex),ok);
  bottom.removeAllViews();TextView msg=text((ok?"✓ Отлично!":"Правильный ответ:")+" \n"+solution+"\n"+expectedRu,16,true);msg.setTextColor(ok?GREEN:RED);msg.setPadding(d(12),d(10),d(12),d(12));msg.setBackground(shape(ok?LIGHT:0xffffeded,13));add(bottom,msg,10);
- add(bottom,button("ПРОДОЛЖИТЬ",true,()->next(ok)),0);
+ add(bottom,button("ДАЛЕЕ →",true,()->next(ok)),0);
  }
  void next(boolean ok){if(repairMode&&!ok)repairs.add(repairs.get(qindex));qindex++;showQuestion();}
 
@@ -206,11 +206,16 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
    },match.start(),match.end(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
    line.setText(span);line.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());line.setHighlightColor(0xff457968);add(wrap,line,0);add(body,wrap,spacing);
  }
+ String wordTranslation(String w){try{for(int i=0;i<bank.length();i++){JSONArray items=bank.getJSONObject(i).getJSONArray("items");for(int j=0;j<items.length();j++){JSONObject x=items.getJSONObject(j);String de=x.getString("de"),ru=x.getString("ru");if(de.toLowerCase(Locale.GERMAN).contains(w))return ru;}}}catch(Exception ignored){}return "Перевод слова уточняется в контексте";}
  void wordHint(String word){
    String basic=normal(word);HashMap<String,String> m=new HashMap<>();
    String[] pairs={"der=определённый артикль, муж. род","die=определённый артикль, жен. род/мн. число","das=определённый артикль, ср. род","ein=неопределённый артикль","eine=неопределённый артикль, жен. род","einen=неопределённый артикль, Akkusativ муж. рода","keine=нет, отрицание существительного","ich=я","du=ты","ist=есть, является","sind=являются","habe=имею","hat=имеет","brauche=нуждаюсь","wohnung=квартира (die)","universität=университет (die)","tisch=стол (der)","bahnhof=вокзал (der)","schwer=тяжёлый","alt=старый","groß=большой","wasser=вода (das)","student=студент (der)","auto=автомобиль (das)","lehrer=учитель (der)"};
    for(String p:pairs){String[] ab=p.split("=",2);m.put(ab[0],ab[1]);}
-   new AlertDialog.Builder(this).setTitle(word).setMessage(m.getOrDefault(basic,"Полный перевод этого слова пока отсутствует в локальном словаре.")).setPositiveButton("OK",null).show();
+   String translation=m.getOrDefault(basic,wordTranslation(basic));
+   android.widget.PopupWindow popup=new android.widget.PopupWindow(this);
+   TextView bubble=text(translation,14,true);bubble.setPadding(d(13),d(10),d(13),d(10));bubble.setBackground(shape(LIGHT,12));
+   popup.setContentView(bubble);popup.setWidth(-2);popup.setHeight(-2);popup.setOutsideTouchable(true);popup.setBackgroundDrawable(shape(LIGHT,12));popup.setElevation(d(7));popup.showAtLocation(root,Gravity.TOP|Gravity.CENTER_HORIZONTAL,0,d(190));
+   bubble.setOnClickListener(v->popup.dismiss());new Handler().postDelayed(()->{if(popup.isShowing())popup.dismiss();},3200);
  }
  void results(){if(!repairMode&&!wrong.isEmpty()){repairMode=true;repairs.addAll(wrong);qindex=0;showRepairIntro();return;}if(repairMode){for(int i=0;i<repairs.size();i++){} }layout(true);TextView trophy=text(score>=8?"★ Отличная работа!":"Урок завершён",28,true);trophy.setTextColor(GOLD);add(body,trophy,28);
  TextView points=text(score+" / "+questionOrder.size()+" правильных",25,true);points.setTextColor(WHITE);add(body,points,14);
