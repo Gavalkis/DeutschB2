@@ -130,9 +130,23 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  }
  void dictionary(){header("WÖRTER","Словарь","Слова с родом, множественным числом и переводом. Для повторения используй практику.");
  try{java.io.BufferedReader r=new java.io.BufferedReader(new java.io.InputStreamReader(getAssets().open("words.csv")));String row;r.readLine();while((row=r.readLine())!=null){String[] p=row.split(";",-1);if(p.length<7)continue;LinearLayout c=card();add(c,title(p[1]+" "+p[2],22),5);add(c,small(p[3]+" · "+p[4]+" · "+p[0]),9);add(c,text(p[5],17,true),5);add(c,small(p[6]),12);String word=p[1]+" "+p[2];add(c,button("🔊 СЛУШАТЬ",false,()->talk(word,word)),0);add(body,c,12);}}catch(Exception e){} }
+ void writing(){
+    layout(false);header("SCHREIBEN B1/B2","Письменная практика","Напиши небольшой связный текст. Офлайн проверяется объём и наличие ключевых слов. Смысл, грамматику и стиль оценивай по чек-листу.");
+    int lvl=done()<18?0:done()<21?1:2;
+    String topic=lvl==0?"Сообщение другу: ты переносишь встречу. Объясни причину и предложи новое время.":lvl==1?"Письмо в университет: спроси об условиях поступления, документах и сроках.":"Аргументированное мнение: стоит ли студентам совмещать учёбу и работу? Приведи 2 аргумента, контраргумент и вывод.";
+    add(body,title(topic,21),16);
+    add(body,small(lvl==0?"40-60 слов":lvl==1?"80-120 слов":"150-200 слов"),15);
+    EditText essay=new EditText(this);essay.setGravity(Gravity.TOP);essay.setHint("Пиши по-немецки...");essay.setMinLines(10);essay.setBackground(shape(WHITE,16));essay.setPadding(d(14),d(16),d(14),d(16));add(body,essay,15);
+    add(body,button("СОХРАНИТЬ И ПРОВЕРИТЬ ОБЪЁМ",true,()->{
+        String txt=essay.getText().toString().trim();int count=txt.isEmpty()?0:txt.split("\\s+").length;
+        prefs.edit().putString("writing_"+lvl,txt).apply();
+        new AlertDialog.Builder(this).setTitle("Написано: "+count+" слов").setMessage("Чек-лист: 1) Выполнены все пункты задания? 2) Глагол в главном предложении на позиции 2? 3) После weil/dass глагол в конце? 4) Верные артикли и падежи? 5) Есть связки и вывод?\\n\\nЭто самопроверка, не автоматическая оценка Goethe.").setPositiveButton("Понятно",null).show();
+    }),10);
+    add(body,button("ВЕРНУТЬСЯ К ПРАКТИКЕ",false,()->draw(3)),0);
+ }
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
  String[] n={"Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
- for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->startPractice(Math.min(done(),22),false)),0);add(body,c,12);}
+ for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->mode.equals("Письмо и перевод")?writing():startPractice(Math.min(done(),22),false)),0);add(body,c,12);}
  }
  void camera(){header("WÖRTER UM MICH","Камера и перевод","Для распознавания предметов понадобится интернет и настроенный ключ облачного сервиса.");LinearLayout c=card();add(c,text("В этом выпуске модуль распознавания открывается отдельно, чтобы обучение и проверка ответов работали без интернета.",16,false),15);add(c,button("ОТКРЫТЬ КАМЕРУ",true,()->{Intent intent=new Intent(this,MainActivity.class);intent.putExtra("camera",true);startActivity(intent);}),0);add(body,c,12);}
  void startExam(int end){startPractice(end,true);}
