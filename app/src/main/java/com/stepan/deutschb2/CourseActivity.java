@@ -48,22 +48,53 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  void navbar(int selected){LinearLayout bar=horizontal();for(int i=0;i<tabs.length;i++){final int idx=i;LinearLayout item=vertical();item.setGravity(Gravity.CENTER);item.setPadding(d(2),d(9),d(2),d(9));item.setBackground(shape(i==selected?LIGHT:WHITE,14));TextView ic=text(new String[]{"⌂","◉","▤","✓","◎"}[i],22,true);ic.setGravity(Gravity.CENTER);ic.setTextColor(i==selected?GREEN:MUTED);item.addView(ic);TextView lab=text(tabs[i],11,i==selected);lab.setSingleLine(true);lab.setTextSize(10);lab.setGravity(Gravity.CENTER);lab.setPadding(0,d(3),0,0);lab.setTextColor(i==selected?GREEN:MUTED);item.addView(lab);bar.addView(item,new LinearLayout.LayoutParams(0,d(72),1));item.setOnClickListener(v->draw(idx));}bottom.addView(bar);}
  void draw(int dest){page=dest;layout(false);if(dest==0)home();if(dest==1)path();if(dest==2)dictionary();if(dest==3)practiceHub();if(dest==4)camera();navbar(dest);}
  int done(){return prefs.getInt("unlocked",0);}
- void home(){header("MEIN DEUTSCH","Сегодня твой день","От теории к живой речи. Каждый урок открывает следующий шаг.");
- LinearLayout hero=card();hero.setBackground(shape(GREEN,24));TextView a=text("DEUTSCH A1 → B2",15,true);a.setTextColor(WHITE);add(hero,a,12);
- TextView b=text("Урок "+(Math.min(done()+1,23))+" из 23",28,true);b.setTextColor(WHITE);add(hero,b,8);TextView c=text("По одной небольшой теме. Потом практика и повторение.",15,false);c.setTextColor(0xffdfefe6);add(hero,c,18);
- add(hero,button("ПРОДОЛЖИТЬ →",false,()->openLesson(Math.min(done(),22))),0);add(body,hero,20);
- LinearLayout today=card();add(today,title("Твоя практика",21),15);
- for(String s:new String[]{"◷  Повторение слов и правил","♫  Слушание и диктант","✎  Построение предложений","◎  Произношение вслух"})add(today,text(s,16,false),15);
- add(today,button("ТРЕНИРОВАТЬСЯ",true,()->draw(3)),0);add(body,today,18);
- LinearLayout tip=card();add(tip,title("Правило обучения",20),10);add(tip,text("Сначала разбираешь структуру предложения и новые слова с переводом. Затем строишь предложения самостоятельно. Ошибки возвращаются в следующих занятиях.",15,false),0);add(body,tip,12);
+
+ void home(){
+  header("MEIN DEUTSCH","Guten Morgen!","Каждый день немного немецкого. Теория, речь и практика.");
+  int finished=Math.min(store.unlocked(),24);int percent=(int)Math.round(100.0*finished/24);
+  LinearLayout hero=card();hero.setBackground(shape(GREEN,24));
+  LinearLayout heroRow=horizontal();LinearLayout details=vertical();
+  TextView n=text(percent+"% пути до B2",22,true);n.setTextColor(WHITE);add(details,n,6);
+  TextView lvl=text("Текущий уровень: "+level(Math.min(finished,23)),15,false);lvl.setTextColor(0xffdeede5);add(details,lvl,9);
+  ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);progress.setProgress(percent);add(details,progress,8);
+  TextView st=text("🔥 "+store.streak()+" дней подряд",15,true);st.setTextColor(WHITE);add(details,st,0);
+  heroRow.addView(details,new LinearLayout.LayoutParams(0,-2,1));
+  MascotView tiger=new MascotView(this,store.streak()>1?1:0);heroRow.addView(tiger,new LinearLayout.LayoutParams(d(100),d(132)));
+  add(hero,heroRow,17);add(hero,button("ПРОДОЛЖИТЬ УРОК",false,()->openLesson(Math.min(finished,23))),0);add(body,hero,18);
+
+  LinearLayout today=card();add(today,title("Сегодня",22),12);
+  add(today,text("◉ Изучить 1 правило и пройти практику",16,false),10);
+  add(today,text("↻ Повторить "+store.dueCount()+" слов и конструкций",16,false),10);
+  add(today,text("♫ Потренировать аудирование",16,false),10);
+  add(today,text("✎ Написать 3 предложения",16,false),15);
+  add(today,button("НАЧАТЬ ТРЕНИРОВКУ",true,()->draw(3)),0);add(body,today,15);
+
+  LinearLayout stats=card();add(stats,title("Статистика",22),12);
+  add(stats,text("✓ Ответов: "+store.answers()+"  •  Верных: "+store.right(),16,false),10);
+  add(stats,text("▤ Выученных слов: "+store.words(),16,false),10);
+  add(stats,text("◷ Время занятий: "+store.minutes()+" мин",16,false),0);add(body,stats,15);
+
+  LinearLayout theory=card();add(theory,title("Справочник грамматики",22),9);
+  add(theory,small("Все таблицы склонений, артикли, местоимения, падежи, времена и правила порядка слов."),14);
+  add(theory,button("ОТКРЫТЬ ТЕОРИЮ",true,()->reference()),0);add(body,theory,15);
+ }
+ void reference(){layout(false);header("NACH­SCHLAGEN","Грамматика A1-B2","Подробные правила и таблицы с примерами и переводами.");
+  String[] topics={"Артикли, ein/kein/Ø","Падежи и склонения","Личные местоимения","Притяжательные местоимения","Времена: Präsens, Präteritum, Perfekt","Plusquamperfekt и Futur I","Предлоги и управление","Порядок слов"};
+  int[] selected={23,3,4,5,11,12,14,8};
+  for(int j=0;j<topics.length;j++){final int v=selected[j];LinearLayout c=card();add(c,title(topics[j],18),8);
+    if(j==1)add(c,small("Nom: der/die/das • Akk: den/die/das • Dat: dem/der/dem • Gen: des/der/des"),10);
+    if(j==4)add(c,small("Präsens - настоящее; Präteritum/Perfekt - прошедшее"),10);
+    if(j==5)add(c,small("Ich hatte gelernt - я уже выучил. Ich werde lernen - я буду учиться."),10);
+    add(c,button("ПРАВИЛО И ПРИМЕРЫ",true,()->{unit=v;stage=0;showTheory();}),0);add(body,c,12);
+  }
  }
  String level(int i){return i<9?"A1":i<18?"A2":i<21?"B1":"B2";}
  void path(){header("КУРС","Маршрут A1 → B2","23 раздела грамматики, теория частями и упражнения после каждой части. Учебный контент постепенно расширяется.");
- for(int i=0;i<23;i++){final int idx=i;try{JSONObject l=lessons.getJSONObject(i);LinearLayout c=card();boolean open=i<=done();c.setAlpha(open?1:.48f);
+ for(int i=0;i<24;i++){final int idx=i;try{JSONObject l=lessons.getJSONObject(i);LinearLayout c=card();boolean open=i<=Math.max(done(),23==i?done():0);c.setAlpha(open?1:.48f);
  TextView lab=small(level(i)+"  ·  УРОК "+(i+1)+(prefs.getBoolean("complete_"+i,false)?"   ✓ ПРОЙДЕН":""));add(c,lab,8);add(c,title(l.getString("title"),19),9);
  add(c,small(open?"Теория → примеры → практика":"Откроется после предыдущего урока"),12);
  if(open)add(c,button(prefs.getBoolean("complete_"+i,false)?"ПОВТОРИТЬ":"НАЧАТЬ",true,()->openLesson(idx)),0);add(body,c,13);
- if(i==8||i==17||i==20||i==22){final int bound=i;add(body,button("◈ ПРОВЕРКА УРОВНЯ "+level(i),false,()->startExam(bound)),17);}
+ if(i==8||i==17||i==20||i==23){final int bound=i;add(body,button("◈ ПРОВЕРКА УРОВНЯ "+level(i),false,()->startExam(bound)),17);}
  }catch(Exception ignored){}}
  }
  void openLesson(int i){unit=i;stage=0;showTheory();overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);}
@@ -188,6 +219,23 @@ public class CourseActivity extends Activity implements TextToSpeech.OnInitListe
  void practiceHub(){header("НАВЫКИ","Тренировка","Проверяй грамматику, лексику, аудирование и речь на материалах уже открытых тем.");
  String[] n={"Пробелы и окончания","Сборка предложений","Аудирование","Письмо и перевод","Произношение","Смешанное повторение"};
  for(String mode:n){LinearLayout c=card();add(c,title(mode,19),11);add(c,button("НАЧАТЬ",true,()->{if(mode.equals("Письмо и перевод"))writing();else startPractice(Math.min(done(),22),false);}),0);add(body,c,12);}
+ }
+
+ static class MascotView extends View{
+   final android.graphics.Paint p=new android.graphics.Paint(3);int mood;public MascotView(Context c,int m){super(c);mood=m;}
+   void oval(android.graphics.Canvas c,int col,float a,float b,float x,float y){p.setColor(col);p.setStyle(android.graphics.Paint.Style.FILL);c.drawOval(a,b,x,y,p);}
+   protected void onDraw(android.graphics.Canvas cv){super.onDraw(cv);cv.save();cv.scale(getWidth()/140f,getHeight()/170f);
+     int orange=0xffffaa46,dk=0xff273b32,cream=0xffffe4b9;
+     oval(cv,orange,15,35,125,150);oval(cv,orange,13,13,45,57);oval(cv,orange,92,13,126,57);
+     oval(cv,0xfff9dba5,24,52,116,133);oval(cv,cream,45,92,95,135);
+     oval(cv,dk,39,67,51,83);oval(cv,dk,88,67,100,83);oval(cv,dk,64,98,77,108);
+     p.setColor(dk);p.setStrokeWidth(5);p.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+     cv.drawLine(52,35,59,55,p);cv.drawLine(82,35,77,55,p);
+     cv.drawLine(19,84,35,88,p);cv.drawLine(104,88,121,84,p);
+     if(mood==1){p.setStyle(android.graphics.Paint.Style.STROKE);cv.drawArc(51,102,88,120,0,180,false,p);p.setStyle(android.graphics.Paint.Style.FILL);}
+     else{p.setStrokeWidth(3);cv.drawLine(64,116,79,116,p);}
+     cv.restore();
+   }
  }
  void camera(){header("WÖRTER UM MICH","Камера и перевод","Для распознавания предметов понадобится интернет и настроенный ключ облачного сервиса.");LinearLayout c=card();add(c,text("В этом выпуске модуль распознавания открывается отдельно, чтобы обучение и проверка ответов работали без интернета.",16,false),15);add(c,button("ОТКРЫТЬ КАМЕРУ",true,()->{Intent intent=new Intent(this,MainActivity.class);intent.putExtra("camera",true);startActivity(intent);}),0);add(body,c,12);}
  void startExam(int end){startPractice(end,true);}
